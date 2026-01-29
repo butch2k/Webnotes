@@ -76,6 +76,31 @@ app.get("/api/notebooks", async (req, res, next) => {
   }
 });
 
+// Rename notebook
+app.put("/api/notebooks/:name", async (req, res, next) => {
+  try {
+    const oldName = req.params.name;
+    const { newName } = req.body;
+    if (!newName || typeof newName !== "string" || newName.length > 100) {
+      return res.status(400).json({ error: "invalid newName" });
+    }
+    const count = await db.renameNotebook(oldName, newName.trim());
+    res.json({ updated: count });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Delete notebook (unfile notes)
+app.delete("/api/notebooks/:name", async (req, res, next) => {
+  try {
+    const count = await db.deleteNotebook(req.params.name);
+    res.json({ updated: count });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // List notes
 app.get("/api/notes", async (req, res, next) => {
   try {
@@ -88,12 +113,49 @@ app.get("/api/notes", async (req, res, next) => {
   }
 });
 
+// Bulk operations
+app.post("/api/notes/bulk", async (req, res, next) => {
+  try {
+    const { action, ids, notebook } = req.body;
+    if (!Array.isArray(ids) || !ids.length) {
+      return res.status(400).json({ error: "ids must be a non-empty array" });
+    }
+    if (!ids.every((id) => typeof id === "number" || /^\d+$/.test(id))) {
+      return res.status(400).json({ error: "invalid ids" });
+    }
+    if (action === "delete") {
+      const count = await db.bulkDelete(ids);
+      return res.json({ deleted: count });
+    }
+    if (action === "move") {
+      if (typeof notebook !== "string") {
+        return res.status(400).json({ error: "notebook must be a string" });
+      }
+      const count = await db.bulkMove(ids, notebook);
+      return res.json({ moved: count });
+    }
+    res.status(400).json({ error: "unknown action" });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // Get single note
 app.get("/api/notes/:id", validateId, async (req, res, next) => {
   try {
     const note = await db.getNote(req.params.id);
     if (!note) return res.status(404).json({ error: "Not found" });
     res.json(note);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Get note versions
+app.get("/api/notes/:id/versions", validateId, async (req, res, next) => {
+  try {
+    const versions = await db.getVersions(req.params.id);
+    res.json(versions);
   } catch (err) {
     next(err);
   }

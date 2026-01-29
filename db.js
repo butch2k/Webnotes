@@ -66,6 +66,22 @@ async function initDb() {
       END IF;
     END $$
   `);
+
+  // Note versions table
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS note_versions (
+      id SERIAL PRIMARY KEY,
+      note_id INTEGER NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+      title VARCHAR(255) NOT NULL,
+      content TEXT NOT NULL,
+      language VARCHAR(50) NOT NULL,
+      saved_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_note_versions_note_id ON note_versions(note_id)
+  `);
 }
 
 const NOTE_COLS = "id, title, content, language, pinned, notebook, created_at, updated_at";
@@ -119,6 +135,24 @@ async function createNote({ title, content, language, notebook }) {
 }
 
 async function updateNote(id, { title, content, language, pinned, notebook }) {
+  // Save version before modifying if content changes
+  if (content !== undefined) {
+    const current = await getNote(id);
+    if (current && current.content !== content) {
+      await pool.query(
+        `INSERT INTO note_versions (note_id, title, content, language, saved_at) VALUES ($1, $2, $3, $4, $5)`,
+        [id, current.title, current.content, current.language, current.updated_at]
+      );
+      // Keep only last 20 versions
+      await pool.query(
+        `DELETE FROM note_versions WHERE note_id = $1 AND id NOT IN (
+          SELECT id FROM note_versions WHERE note_id = $1 ORDER BY saved_at DESC LIMIT 20
+        )`,
+        [id]
+      );
+    }
+  }
+
   const { rows } = await pool.query(
     `UPDATE notes SET
        title = COALESCE($1, title),
@@ -157,8 +191,55 @@ async function listNotebooks() {
   return rows;
 }
 
+async function renameNotebook(oldName, newName) {
+  const { rowCount } = await pool.query(
+    `UPDATE notes SET notebook = $1, updated_at = NOW() WHERE notebook = $2`,
+    [newName, oldName]
+  );
+  return rowCount;
+}
+
+async function deleteNotebook(name) {
+  const { rowCount } = await pool.query(
+    `UPDATE notes SET notebook = '', updated_at = NOW() WHERE notebook = $1`,
+    [name]
+  );
+  return rowCount;
+}
+
+async function bulkDelete(ids) {
+  if (!ids.length) return 0;
+  const placeholders = ids.map((_, i) => `$${i + 1}`).join(",");
+  const { rowCount } = await pool.query(
+    `DELETE FROM notes WHERE id IN (${placeholders})`,
+    ids.map(Number)
+  );
+  return rowCount;
+}
+
+async function bulkMove(ids, notebook) {
+  if (!ids.length) return 0;
+  const placeholders = ids.map((_, i) => `$${i + 2}`).join(",");
+  const { rowCount } = await pool.query(
+    `UPDATE notes SET notebook = $1, updated_at = NOW() WHERE id IN (${placeholders})`,
+    [notebook, ...ids.map(Number)]
+  );
+  return rowCount;
+}
+
+async function getVersions(id) {
+  const { rows } = await pool.query(
+    `SELECT title, content, language, saved_at FROM note_versions WHERE note_id = $1 ORDER BY saved_at DESC`,
+    [id]
+  );
+  return rows;
+}
+
 async function close() {
   await pool.end();
 }
 
-module.exports = { initDb, listNotes, listNotebooks, getNote, createNote, updateNote, deleteNote, healthCheck, close };
+module.exports = {
+  initDb, listNotes, listNotebooks, getNote, createNote, updateNote, deleteNote,
+  healthCheck, close, renameNotebook, deleteNotebook, bulkDelete, bulkMove, getVersions,
+};
