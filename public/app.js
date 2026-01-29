@@ -157,10 +157,10 @@ window.addEventListener("offline", () => setOnline(false));
 
 // === API helpers ===
 async function apiRaw(path, opts = {}) {
-  const headers = opts.body ? { "Content-Type": "application/json" } : {};
+  const headers = opts.body ? { "Content-Type": "application/json", ...opts.headers } : { ...opts.headers };
   const res = await fetch("/api" + path, {
-    headers,
     ...opts,
+    headers,
   });
   if (res.status === 204) return null;
   if (!res.ok) {
@@ -378,7 +378,7 @@ async function openNote(id) {
     showEditor();
     updatePinButton();
     updateStats();
-    if (note.content) togglePreview();
+    if (note.content && !previewing) togglePreview();
     loadNotes();
   } catch {
     const cached = getCachedNotes().find((n) => n.id === id);
@@ -392,7 +392,7 @@ async function openNote(id) {
       showEditor();
       updatePinButton();
       updateStats();
-      if (cached.content) togglePreview();
+      if (cached.content && !previewing) togglePreview();
       renderNoteList(getCachedNotes());
     }
   }
@@ -853,7 +853,7 @@ const EXT_TO_LANG = {
   js: "javascript", mjs: "javascript", cjs: "javascript",
   ts: "typescript", tsx: "typescript",
   py: "python", pyw: "python",
-  java: "java", kt: "java",
+  java: "java",
   c: "c", h: "c",
   cpp: "cpp", cc: "cpp", cxx: "cpp", hpp: "cpp",
   cs: "csharp",
