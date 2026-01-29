@@ -1493,8 +1493,17 @@ document.addEventListener("keydown", (e) => {
     const tag = document.activeElement && document.activeElement.tagName;
     if (tag !== "TEXTAREA" && tag !== "INPUT") {
       e.preventDefault();
-      contentArea.focus();
-      contentArea.select();
+      if (previewing) {
+        const target = !mdPreviewEl.classList.contains("hidden") ? mdPreviewEl : previewEl;
+        const sel = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(target);
+        sel.removeAllRanges();
+        sel.addRange(range);
+      } else {
+        contentArea.focus();
+        contentArea.select();
+      }
       return;
     }
   }
