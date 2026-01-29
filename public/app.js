@@ -814,6 +814,8 @@ function updatePreview() {
   if (isMarkdownMode()) {
     previewEl.classList.add("hidden");
     mdPreviewEl.classList.remove("hidden");
+    // Clear highlighted flags before replacing content
+    mdPreviewEl.querySelectorAll("code[data-highlighted]").forEach((el) => delete el.dataset.highlighted);
     mdPreviewEl.innerHTML = renderMarkdown(contentArea.value);
     return;
   }
@@ -822,6 +824,7 @@ function updatePreview() {
   previewEl.classList.remove("hidden");
 
   const code = previewEl.querySelector("code");
+  delete code.dataset.highlighted;
   code.textContent = contentArea.value;
   code.className = "";
   previewEl.classList.remove("line-numbers");
