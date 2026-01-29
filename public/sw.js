@@ -1,4 +1,4 @@
-const CACHE_NAME = "webnotes-v8";
+const CACHE_NAME = "webnotes-v9";
 const STATIC_ASSETS = [
   "/",
   "/index.html",
@@ -9,24 +9,10 @@ const STATIC_ASSETS = [
   "/icons/icon-512.png",
 ];
 
-const CDN_ASSETS = [
-  "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js",
-  "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css",
-  "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css",
-];
-
-// Install: cache static assets
+// Install: cache same-origin static assets only
 self.addEventListener("install", (e) => {
   e.waitUntil(
-    caches.open(CACHE_NAME).then((cache) =>
-      Promise.all([
-        cache.addAll(STATIC_ASSETS),
-        // CDN assets may fail due to CORS/tracking prevention — ignore failures
-        ...CDN_ASSETS.map((url) =>
-          cache.add(url).catch(() => console.warn("SW: could not cache", url))
-        ),
-      ])
-    )
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
   );
   self.skipWaiting();
 });
@@ -39,7 +25,6 @@ self.addEventListener("activate", (e) => {
         keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))
       )
     ).then(() => {
-      // Notify all clients that a new version is available
       self.clients.matchAll().then((clients) => {
         clients.forEach((client) => client.postMessage({ type: "SW_UPDATED" }));
       });
@@ -48,7 +33,7 @@ self.addEventListener("activate", (e) => {
   self.clients.claim();
 });
 
-// Fetch: network-first for API, stale-while-revalidate for same-origin static assets
+// Fetch: network-only for API, stale-while-revalidate for same-origin static assets
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
 
