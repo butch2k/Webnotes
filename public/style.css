@@ -185,10 +185,11 @@ body:has(.offline-banner:not(.hidden)) .layout {
 /* Notebook bar */
 .notebook-bar {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
   padding: 6px 8px;
   border-bottom: 1px solid var(--border);
-  overflow-x: auto;
+  overflow: hidden;
   flex-shrink: 0;
 }
 .nb-tab {
@@ -200,7 +201,6 @@ body:has(.offline-banner:not(.hidden)) .layout {
   color: var(--text-muted);
   cursor: pointer;
   white-space: nowrap;
-  flex-shrink: 0;
 }
 .nb-tab:hover { background: var(--bg-hover); }
 .nb-tab.active {
