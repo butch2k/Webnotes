@@ -305,7 +305,7 @@ body:has(.offline-banner:not(.hidden)) .layout {
 #note-preview code {
   font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", "Consolas", monospace;
   font-size: 14px;
-  line-height: 1.6;
+  line-height: 1.4;
   padding: 16px 16px 16px 60px !important;
   min-height: 100%;
   display: block;
