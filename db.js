@@ -19,6 +19,23 @@ async function initDb() {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
+
+  // Full-text search: generated tsvector column + GIN index
+  await pool.query(`
+    DO $$ BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'notes' AND column_name = 'search_vector'
+      ) THEN
+        ALTER TABLE notes ADD COLUMN search_vector tsvector
+          GENERATED ALWAYS AS (
+            setweight(to_tsvector('english', coalesce(title, '')), 'A') ||
+            setweight(to_tsvector('english', coalesce(content, '')), 'B')
+          ) STORED;
+        CREATE INDEX IF NOT EXISTS idx_notes_search ON notes USING GIN (search_vector);
+      END IF;
+    END $$
+  `);
 }
 
 module.exports = { pool, initDb };

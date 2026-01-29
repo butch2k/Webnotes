@@ -1,9 +1,56 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
+/* === Theme tokens === */
+:root, [data-theme="dark"] {
+  --bg-primary: #1e1e2e;
+  --bg-secondary: #181825;
+  --bg-input: #313244;
+  --bg-hover: #313244;
+  --bg-active: #45475a;
+  --bg-btn: #45475a;
+  --bg-btn-hover: #585b70;
+  --border: #313244;
+  --border-input: #45475a;
+  --text-primary: #cdd6f4;
+  --text-muted: #9399b2;
+  --text-faint: #585b70;
+  --accent: #cba6f7;
+  --accent-hover: #b4befe;
+  --accent-on: #1e1e2e;
+  --danger: #f38ba8;
+  --success: #a6e3a1;
+  --warning-bg: #f9e2af;
+  --warning-text: #1e1e2e;
+  color-scheme: dark;
+}
+
+[data-theme="light"] {
+  --bg-primary: #eff1f5;
+  --bg-secondary: #e6e9ef;
+  --bg-input: #ccd0da;
+  --bg-hover: #dce0e8;
+  --bg-active: #bcc0cc;
+  --bg-btn: #ccd0da;
+  --bg-btn-hover: #bcc0cc;
+  --border: #ccd0da;
+  --border-input: #bcc0cc;
+  --text-primary: #4c4f69;
+  --text-muted: #6c6f85;
+  --text-faint: #9ca0b0;
+  --accent: #8839ef;
+  --accent-hover: #7287fd;
+  --accent-on: #ffffff;
+  --danger: #d20f39;
+  --success: #40a02b;
+  --warning-bg: #df8e1d;
+  --warning-text: #ffffff;
+  color-scheme: light;
+}
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  background: #1e1e2e;
-  color: #cdd6f4;
+  background: var(--bg-primary);
+  color: var(--text-primary);
   height: 100vh;
   overflow: hidden;
 }
@@ -23,8 +70,8 @@ body {
 
 /* Offline banner */
 .offline-banner {
-  background: #f9e2af;
-  color: #1e1e2e;
+  background: var(--warning-bg);
+  color: var(--warning-text);
   text-align: center;
   padding: 8px 16px;
   font-size: 13px;
@@ -43,8 +90,8 @@ body:has(.offline-banner:not(.hidden)) .layout {
 .sidebar {
   width: 260px;
   min-width: 260px;
-  background: #181825;
-  border-right: 1px solid #313244;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
 }
@@ -53,19 +100,31 @@ body:has(.offline-banner:not(.hidden)) .layout {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px;
-  border-bottom: 1px solid #313244;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
 }
 
 .sidebar-header h1 {
   font-size: 18px;
   font-weight: 600;
-  color: #cba6f7;
+  color: var(--accent);
+}
+
+.sidebar-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+#btn-theme {
+  padding: 6px 8px;
+  font-size: 16px;
+  line-height: 1;
 }
 
 #btn-new {
-  background: #cba6f7;
-  color: #1e1e2e;
+  background: var(--accent);
+  color: var(--accent-on);
   border: none;
   padding: 6px 14px;
   border-radius: 6px;
@@ -73,24 +132,24 @@ body:has(.offline-banner:not(.hidden)) .layout {
   font-weight: 600;
   font-size: 13px;
 }
-#btn-new:hover { background: #b4befe; }
+#btn-new:hover { background: var(--accent-hover); }
 
 .sidebar-search {
   padding: 8px;
-  border-bottom: 1px solid #313244;
+  border-bottom: 1px solid var(--border);
 }
 #search-input {
   width: 100%;
-  background: #313244;
-  border: 1px solid #45475a;
-  color: #cdd6f4;
+  background: var(--bg-input);
+  border: 1px solid var(--border-input);
+  color: var(--text-primary);
   padding: 7px 10px;
   border-radius: 6px;
   font-size: 13px;
   outline: none;
 }
-#search-input:focus-visible { border-color: #cba6f7; outline: 1px solid #cba6f7; }
-#search-input::placeholder { color: #9399b2; }
+#search-input:focus-visible { border-color: var(--accent); outline: 1px solid var(--accent); }
+#search-input::placeholder { color: var(--text-muted); }
 
 #note-list {
   list-style: none;
@@ -107,13 +166,13 @@ body:has(.offline-banner:not(.hidden)) .layout {
   display: flex;
   flex-direction: column;
 }
-#note-list li:hover { background: #313244; }
+#note-list li:hover { background: var(--bg-hover); }
 #note-list li:focus-visible {
-  background: #313244;
-  outline: 2px solid #cba6f7;
+  background: var(--bg-hover);
+  outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
-#note-list li.active { background: #45475a; }
+#note-list li.active { background: var(--bg-active); }
 
 #note-list li .note-item-title {
   font-size: 14px;
@@ -124,12 +183,12 @@ body:has(.offline-banner:not(.hidden)) .layout {
 }
 #note-list li .note-item-meta {
   font-size: 11px;
-  color: #9399b2;
+  color: var(--text-muted);
   margin-top: 2px;
 }
 
 .note-list-empty {
-  color: #6c7086;
+  color: var(--text-muted);
   font-size: 13px;
   text-align: center;
   padding: 16px 12px;
@@ -148,7 +207,7 @@ body:has(.offline-banner:not(.hidden)) .layout {
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: #9399b2;
+  color: var(--text-muted);
   font-size: 16px;
 }
 
@@ -157,33 +216,33 @@ body:has(.offline-banner:not(.hidden)) .layout {
   align-items: center;
   gap: 10px;
   padding: 12px 16px;
-  border-bottom: 1px solid #313244;
-  background: #181825;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-secondary);
 }
 
 #note-title {
   flex: 1;
-  background: #313244;
-  border: 1px solid #45475a;
-  color: #cdd6f4;
+  background: var(--bg-input);
+  border: 1px solid var(--border-input);
+  color: var(--text-primary);
   padding: 8px 12px;
   border-radius: 6px;
   font-size: 14px;
   outline: none;
 }
-#note-title:focus-visible { border-color: #cba6f7; outline: 1px solid #cba6f7; }
+#note-title:focus-visible { border-color: var(--accent); outline: 1px solid var(--accent); }
 
 #note-lang {
-  background: #313244;
-  border: 1px solid #45475a;
-  color: #cdd6f4;
+  background: var(--bg-input);
+  border: 1px solid var(--border-input);
+  color: var(--text-primary);
   padding: 8px 10px;
   border-radius: 6px;
   font-size: 13px;
   outline: none;
   cursor: pointer;
 }
-#note-lang:focus-visible { border-color: #cba6f7; outline: 1px solid #cba6f7; }
+#note-lang:focus-visible { border-color: var(--accent); outline: 1px solid var(--accent); }
 
 .toolbar-btn {
   padding: 8px 14px;
@@ -192,12 +251,12 @@ body:has(.offline-banner:not(.hidden)) .layout {
   cursor: pointer;
   font-size: 13px;
   font-weight: 500;
-  background: #45475a;
-  color: #cdd6f4;
+  background: var(--bg-btn);
+  color: var(--text-primary);
 }
-.toolbar-btn:hover { background: #585b70; }
-.toolbar-btn:focus-visible { outline: 2px solid #cba6f7; outline-offset: 2px; }
-.toolbar-btn.active { background: #cba6f7; color: #1e1e2e; }
+.toolbar-btn:hover { background: var(--bg-btn-hover); }
+.toolbar-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.toolbar-btn.active { background: var(--accent); color: var(--accent-on); }
 
 #btn-delete {
   padding: 8px 14px;
@@ -206,18 +265,18 @@ body:has(.offline-banner:not(.hidden)) .layout {
   cursor: pointer;
   font-size: 13px;
   font-weight: 500;
-  background: #45475a;
-  color: #f38ba8;
+  background: var(--bg-btn);
+  color: var(--danger);
 }
-#btn-delete:hover { background: #f38ba8; color: #1e1e2e; }
-#btn-delete:focus-visible { outline: 2px solid #f38ba8; outline-offset: 2px; }
+#btn-delete:hover { background: var(--danger); color: var(--accent-on); }
+#btn-delete:focus-visible { outline: 2px solid var(--danger); outline-offset: 2px; }
 
-#btn-new:focus-visible { outline: 2px solid #cba6f7; outline-offset: 2px; }
+#btn-new:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 #note-content {
   flex: 1;
-  background: #1e1e2e;
-  color: #cdd6f4;
+  background: var(--bg-primary);
+  color: var(--text-primary);
   border: none;
   padding: 16px;
   font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", "Consolas", monospace;
@@ -227,7 +286,7 @@ body:has(.offline-banner:not(.hidden)) .layout {
   outline: none;
   tab-size: 2;
 }
-#note-content:focus-visible { outline: 2px solid #cba6f7; outline-offset: -2px; }
+#note-content:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 
 #note-preview {
   flex: 1;
@@ -258,7 +317,7 @@ body:has(.offline-banner:not(.hidden)) .layout {
   left: -44px;
   width: 32px;
   text-align: right;
-  color: #585b70;
+  color: var(--text-faint);
   user-select: none;
   pointer-events: none;
 }
@@ -268,7 +327,7 @@ body:has(.offline-banner:not(.hidden)) .layout {
 /* Saved indicator */
 .save-indicator {
   font-size: 11px;
-  color: #a6e3a1;
+  color: var(--success);
   padding: 4px 8px;
   opacity: 0;
   transition: opacity 0.3s;

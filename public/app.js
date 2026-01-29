@@ -9,18 +9,53 @@ const btnNew = document.getElementById("btn-new");
 const btnPreview = document.getElementById("btn-preview");
 const btnCopy = document.getElementById("btn-copy");
 const btnDelete = document.getElementById("btn-delete");
+const btnTheme = document.getElementById("btn-theme");
+const themeIcon = document.getElementById("theme-icon");
 const saveIndicator = document.querySelector(".save-indicator");
 const offlineBanner = document.getElementById("offline-banner");
 const searchInput = document.getElementById("search-input");
 
 let currentNoteId = null;
 let saveTimeout = null;
+let searchTimeout = null;
 let previewing = false;
 let online = navigator.onLine;
 let searchQuery = "";
-let lastNotes = []; // latest full note list (for filtering)
+let lastNotes = [];
 
-// --- Offline queue (localStorage-backed) ---
+// === Theme ===
+const THEME_KEY = "webnotes_theme";
+
+function getTheme() {
+  return localStorage.getItem(THEME_KEY) || "dark";
+}
+
+function setTheme(theme) {
+  document.documentElement.setAttribute("data-theme", theme);
+  localStorage.setItem(THEME_KEY, theme);
+
+  // Toggle highlight.js stylesheets
+  const darkSheet = document.getElementById("hljs-dark");
+  const lightSheet = document.getElementById("hljs-light");
+  if (theme === "light") {
+    darkSheet.disabled = true;
+    lightSheet.disabled = false;
+  } else {
+    darkSheet.disabled = false;
+    lightSheet.disabled = true;
+  }
+
+  themeIcon.textContent = theme === "dark" ? "\u2600" : "\u263E";
+
+  // Re-render preview if open
+  if (previewing) updatePreview();
+}
+
+function toggleTheme() {
+  setTheme(getTheme() === "dark" ? "light" : "dark");
+}
+
+// === Offline queue (localStorage-backed) ===
 const QUEUE_KEY = "webnotes_pending";
 const CACHE_KEY = "webnotes_cache";
 
@@ -72,7 +107,6 @@ async function flushQueue() {
             body: JSON.stringify(entry.data),
           });
           if (created) {
-            // Rewrite any subsequent queued operations that reference the temp ID
             const tempId = entry.tempId;
             const realId = created.id;
             if (currentNoteId === tempId) {
@@ -99,7 +133,7 @@ async function flushQueue() {
   }
 }
 
-// --- Connection status ---
+// === Connection status ===
 function setOnline(value) {
   online = value;
   offlineBanner.classList.toggle("hidden", online);
@@ -109,7 +143,7 @@ function setOnline(value) {
 window.addEventListener("online", () => setOnline(true));
 window.addEventListener("offline", () => setOnline(false));
 
-// --- API helpers ---
+// === API helpers ===
 async function apiRaw(path, opts = {}) {
   const res = await fetch("/api" + path, {
     headers: { "Content-Type": "application/json" },
@@ -136,8 +170,9 @@ async function api(path, opts = {}) {
   }
 }
 
-// --- Search / filter ---
-function filterNotes(notes) {
+// === Search ===
+// Client-side filter for offline / instant fallback
+function filterNotesLocal(notes) {
   if (!searchQuery) return notes;
   const q = searchQuery.toLowerCase();
   return notes.filter(
@@ -150,13 +185,36 @@ function filterNotes(notes) {
 
 searchInput.addEventListener("input", () => {
   searchQuery = searchInput.value.trim();
+  // Immediate client-side filter for responsiveness
   renderNoteList(lastNotes);
+  // Debounced server-side search when online
+  clearTimeout(searchTimeout);
+  if (online && searchQuery) {
+    searchTimeout = setTimeout(serverSearch, 300);
+  }
 });
 
-// --- Note list ---
+async function serverSearch() {
+  if (!searchQuery) return;
+  try {
+    const notes = await api("/notes?q=" + encodeURIComponent(searchQuery));
+    // Only apply if the search query hasn't changed while waiting
+    if (searchQuery === searchInput.value.trim()) {
+      lastNotes = notes;
+      renderNoteList(notes);
+    }
+  } catch {
+    // Fall back to local filter (already rendered)
+  }
+}
+
+// === Note list ===
 async function loadNotes() {
   try {
-    const notes = await api("/notes");
+    const path = searchQuery
+      ? "/notes?q=" + encodeURIComponent(searchQuery)
+      : "/notes";
+    const notes = await api(path);
     setCachedNotes(notes);
     lastNotes = notes;
     renderNoteList(notes);
@@ -167,7 +225,8 @@ async function loadNotes() {
 }
 
 function renderNoteList(notes) {
-  const filtered = filterNotes(notes);
+  // Apply client-side filter (also covers offline and non-search case)
+  const filtered = searchQuery && online ? notes : filterNotesLocal(notes);
   noteList.innerHTML = "";
   if (!filtered.length) {
     const p = document.createElement("li");
@@ -201,7 +260,7 @@ function renderNoteList(notes) {
   });
 }
 
-// --- Open / Create / Save / Delete ---
+// === Open / Create / Save / Delete ===
 async function openNote(id) {
   try {
     const note = await api("/notes/" + id);
@@ -314,25 +373,24 @@ async function deleteNote() {
   loadNotes();
 }
 
-// --- Copy to clipboard ---
+// === Copy to clipboard ===
 async function copyToClipboard() {
   if (!contentArea.value) return;
   try {
     await navigator.clipboard.writeText(contentArea.value);
     flashSaved("Copied!");
   } catch {
-    // Fallback
     contentArea.select();
     document.execCommand("copy");
     flashSaved("Copied!");
   }
 }
 
-// --- Preview with line numbers ---
+// === Preview with line numbers ===
 function togglePreview() {
   previewing = !previewing;
   btnPreview.classList.toggle("active", previewing);
-  btnPreview.setAttribute("aria-pressed", previewing);
+  btnPreview.setAttribute("aria-pressed", String(previewing));
   contentArea.classList.toggle("hidden", previewing);
   previewEl.classList.toggle("hidden", !previewing);
   if (previewing) updatePreview();
@@ -354,23 +412,20 @@ function updatePreview() {
     hljs.highlightElement(code);
   }
 
-  // Wrap lines in <span class="line"> for line numbering
   addLineNumbers(code);
   previewEl.classList.add("line-numbers");
 }
 
 function addLineNumbers(codeEl) {
-  // Split highlighted HTML into lines and wrap each in a .line span
   const html = codeEl.innerHTML;
   const lines = html.split("\n");
-  // Remove trailing empty line that split produces
   if (lines.length > 1 && lines[lines.length - 1] === "") lines.pop();
   codeEl.innerHTML = lines
     .map((line) => `<span class="line">${line || " "}</span>`)
     .join("\n");
 }
 
-// --- UI helpers ---
+// === UI helpers ===
 function showEditor() {
   editorArea.classList.remove("hidden");
   emptyState.classList.add("hidden");
@@ -411,18 +466,16 @@ contentArea.addEventListener("keydown", (e) => {
   }
 });
 
-// --- Keyboard shortcuts ---
+// === Keyboard shortcuts ===
 document.addEventListener("keydown", (e) => {
   const mod = e.ctrlKey || e.metaKey;
 
-  // Ctrl+N — new note
   if (mod && e.key === "n") {
     e.preventDefault();
     createNote();
     return;
   }
 
-  // Ctrl+S — force save
   if (mod && e.key === "s") {
     e.preventDefault();
     clearTimeout(saveTimeout);
@@ -430,30 +483,26 @@ document.addEventListener("keydown", (e) => {
     return;
   }
 
-  // Ctrl+P — toggle preview
   if (mod && e.key === "p") {
     e.preventDefault();
     if (currentNoteId) togglePreview();
     return;
   }
 
-  // Ctrl+Shift+C — copy content
   if (mod && e.shiftKey && e.key === "C") {
     e.preventDefault();
     if (currentNoteId) copyToClipboard();
     return;
   }
 
-  // Escape — close editor / clear search
   if (e.key === "Escape") {
     if (searchQuery) {
       searchInput.value = "";
       searchQuery = "";
-      renderNoteList(lastNotes);
+      loadNotes();
       return;
     }
     if (currentNoteId) {
-      // Flush any pending debounced save before closing
       clearTimeout(saveTimeout);
       saveNote().then(() => {
         currentNoteId = null;
@@ -464,7 +513,6 @@ document.addEventListener("keydown", (e) => {
     return;
   }
 
-  // Ctrl+F — focus search
   if (mod && e.key === "f" && document.activeElement !== contentArea) {
     e.preventDefault();
     searchInput.focus();
@@ -472,11 +520,12 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
-// --- Events ---
+// === Events ===
 btnNew.addEventListener("click", createNote);
 btnDelete.addEventListener("click", deleteNote);
 btnPreview.addEventListener("click", togglePreview);
 btnCopy.addEventListener("click", copyToClipboard);
+btnTheme.addEventListener("click", toggleTheme);
 titleInput.addEventListener("input", scheduleSave);
 contentArea.addEventListener("input", scheduleSave);
 langSelect.addEventListener("change", () => {
@@ -484,7 +533,8 @@ langSelect.addEventListener("change", () => {
   updatePreview();
 });
 
-// --- Init ---
+// === Init ===
+setTheme(getTheme());
 setOnline(navigator.onLine);
 loadNotes();
 flushQueue();

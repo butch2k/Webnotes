@@ -11,7 +11,7 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "https://cdnjs.cloudflare.com"],
+        scriptSrc: ["'self'", "https://cdnjs.cloudflare.com", "'sha256-cjRA/q6pJQvfN+9LVdnggzVPLAqVDMjFLVgcWIVfvsM='"],
         styleSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],
       },
     },
@@ -42,12 +42,47 @@ function validateId(req, res, next) {
   next();
 }
 
-// List all notes (summary only)
+// Health check
+app.get("/health", async (req, res) => {
+  try {
+    await pool.query("SELECT 1");
+    res.json({ status: "ok", db: "connected" });
+  } catch {
+    res.status(503).json({ status: "error", db: "disconnected" });
+  }
+});
+
+// List all notes — supports ?q= for full-text search
 app.get("/api/notes", async (req, res, next) => {
   try {
-    const { rows } = await pool.query(
-      "SELECT id, title, content, language, created_at, updated_at FROM notes ORDER BY updated_at DESC"
-    );
+    const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
+    let rows;
+    if (q) {
+      // Sanitize: strip tsquery special chars, split into tokens, join with &
+      const tokens = q
+        .replace(/[&|!<>():*'"\\]/g, " ")
+        .split(/\s+/)
+        .filter(Boolean);
+      if (!tokens.length) {
+        ({ rows } = await pool.query(
+          "SELECT id, title, content, language, created_at, updated_at FROM notes ORDER BY updated_at DESC"
+        ));
+      } else {
+        const tsquery = tokens.map((t) => t + ":*").join(" & ");
+        ({ rows } = await pool.query(
+          `SELECT id, title, content, language, created_at, updated_at,
+                  ts_rank(search_vector, to_tsquery('english', $1)) AS rank
+           FROM notes
+           WHERE search_vector @@ to_tsquery('english', $1)
+           ORDER BY rank DESC, updated_at DESC`,
+          [tsquery]
+        ));
+      }
+    } else {
+      ({ rows } = await pool.query(
+        "SELECT id, title, content, language, created_at, updated_at FROM notes ORDER BY updated_at DESC"
+      ));
+    }
     res.json(rows);
   } catch (err) {
     next(err);
