@@ -25,9 +25,6 @@
     (function() {
       var t = localStorage.getItem("webnotes_theme") || "dark";
       document.documentElement.setAttribute("data-theme", t);
-      if (t === "light") {
-        // Will be handled properly after DOM loads, but set attribute early
-      }
     })();
   </script>
 </head>

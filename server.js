@@ -11,7 +11,7 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "https://cdnjs.cloudflare.com", "'sha256-rK+Mx+8ZfQh6wMaytxOiKWAGb/f1Z9xO2jXMaczp21Q='", "'sha256-Nny8H/je5llKyTsleHxYL8feCRalb8GOIQ20BMZf8DE='", "'sha256-qnbl7ughnhiwU+erhELQjfSnGqj3thjsxYq9/zMMZXo='"],
+        scriptSrc: ["'self'", "https://cdnjs.cloudflare.com", "'sha256-SNGGNs0Fj0qx1hYYbbNwH+xI7xjt+v10rkTxVCQ4Grw='", "'sha256-Nny8H/je5llKyTsleHxYL8feCRalb8GOIQ20BMZf8DE='", "'sha256-qnbl7ughnhiwU+erhELQjfSnGqj3thjsxYq9/zMMZXo='"],
         workerSrc: ["'self'"],
         imgSrc: ["'self'", "https:", "data:"],
         styleSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],

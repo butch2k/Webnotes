@@ -453,11 +453,12 @@ document.getElementById("bulk-delete").addEventListener("click", async () => {
     });
   } catch {
     // Offline — queue individual deletes
+    let cached = getCachedNotes();
     selectedIds.forEach((id) => {
       enqueue({ type: "delete", noteId: id });
-      const cached = getCachedNotes().filter((n) => n.id !== id);
-      setCachedNotes(cached);
+      cached = cached.filter((n) => n.id !== id);
     });
+    setCachedNotes(cached);
   }
   if (selectedIds.has(currentNoteId)) {
     currentNoteId = null;
@@ -1386,6 +1387,15 @@ document.addEventListener("keydown", (e) => {
   }
 
   if (e.key === "Escape") {
+    if (!versionPanel.classList.contains("hidden")) {
+      const diffView = document.getElementById("version-diff");
+      if (!diffView.classList.contains("hidden")) {
+        diffView.classList.add("hidden");
+      } else {
+        versionPanel.classList.add("hidden");
+      }
+      return;
+    }
     if (bulkMode) {
       exitBulkMode();
       return;
