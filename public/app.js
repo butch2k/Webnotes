@@ -8,6 +8,7 @@ const previewEl = document.getElementById("note-preview");
 const btnNew = document.getElementById("btn-new");
 const btnPreview = document.getElementById("btn-preview");
 const btnCopy = document.getElementById("btn-copy");
+const btnExport = document.getElementById("btn-export");
 const btnDelete = document.getElementById("btn-delete");
 const btnPin = document.getElementById("btn-pin");
 const btnTheme = document.getElementById("btn-theme");
@@ -513,6 +514,32 @@ async function copyToClipboard() {
   }
 }
 
+// === Export / download note ===
+const LANG_TO_EXT = {
+  javascript: "js", typescript: "ts", python: "py", java: "java",
+  c: "c", cpp: "cpp", csharp: "cs", go: "go", rust: "rs", ruby: "rb",
+  php: "php", sql: "sql", bash: "sh", html: "html", css: "css",
+  json: "json", yaml: "yml", xml: "xml", markdown: "md",
+  ini: "ini", nginx: "conf", properties: "properties",
+  dockerfile: "Dockerfile", plaintext: "txt",
+};
+
+function exportNote() {
+  if (!currentNoteId || !contentArea.value) return;
+  const lang = langSelect.value === "auto" ? "plaintext" : langSelect.value;
+  const ext = LANG_TO_EXT[lang] || "txt";
+  const title = titleInput.value || "Untitled";
+  const filename = lang === "dockerfile" ? "Dockerfile" : title.replace(/[^a-zA-Z0-9_\-. ]/g, "_") + "." + ext;
+  const blob = new Blob([contentArea.value], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+  flashSaved("Downloaded!");
+}
+
 // === Word / char / line count ===
 function updateStats() {
   const text = contentArea.value;
@@ -624,8 +651,8 @@ function setupDragDrop(el) {
   el.addEventListener("drop", (e) => {
     e.preventDefault();
     el.classList.remove("drag-over");
-    const file = e.dataTransfer.files[0];
-    if (file) handleFileDrop(file);
+    const files = Array.from(e.dataTransfer.files);
+    files.forEach((file) => handleFileDrop(file));
   });
 }
 
@@ -721,6 +748,12 @@ document.addEventListener("keydown", (e) => {
     return;
   }
 
+  if (e.altKey && e.key === "d") {
+    e.preventDefault();
+    if (currentNoteId) exportNote();
+    return;
+  }
+
   if (e.altKey && e.key === "f") {
     e.preventDefault();
     searchInput.focus();
@@ -728,11 +761,21 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
+// === File upload via input ===
+const fileInput = document.getElementById("file-input");
+const btnUpload = document.getElementById("btn-upload");
+btnUpload.addEventListener("click", () => fileInput.click());
+fileInput.addEventListener("change", () => {
+  Array.from(fileInput.files).forEach((file) => handleFileDrop(file));
+  fileInput.value = "";
+});
+
 // === Events ===
 btnNew.addEventListener("click", createNote);
 btnDelete.addEventListener("click", deleteNote);
 btnPreview.addEventListener("click", togglePreview);
 btnCopy.addEventListener("click", copyToClipboard);
+btnExport.addEventListener("click", exportNote);
 btnPin.addEventListener("click", togglePin);
 btnTheme.addEventListener("click", toggleTheme);
 titleInput.addEventListener("input", scheduleSave);
