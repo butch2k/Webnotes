@@ -469,29 +469,28 @@ contentArea.addEventListener("keydown", (e) => {
 });
 
 // === Keyboard shortcuts ===
+// Use Alt+key to avoid conflicts with browser shortcuts (Ctrl+N, Ctrl+P, etc.)
 document.addEventListener("keydown", (e) => {
-  const mod = e.ctrlKey || e.metaKey;
-
-  if (mod && e.key === "n") {
+  if (e.altKey && e.key === "n") {
     e.preventDefault();
     createNote();
     return;
   }
 
-  if (mod && e.key === "s") {
+  if (e.altKey && e.key === "s") {
     e.preventDefault();
     clearTimeout(saveTimeout);
     saveNote();
     return;
   }
 
-  if (mod && e.key === "p") {
+  if (e.altKey && e.key === "p") {
     e.preventDefault();
     if (currentNoteId) togglePreview();
     return;
   }
 
-  if (mod && e.shiftKey && e.key === "C") {
+  if (e.altKey && e.key === "c") {
     e.preventDefault();
     if (currentNoteId) copyToClipboard();
     return;
@@ -515,7 +514,7 @@ document.addEventListener("keydown", (e) => {
     return;
   }
 
-  if (mod && e.key === "f" && document.activeElement !== contentArea) {
+  if (e.altKey && e.key === "f") {
     e.preventDefault();
     searchInput.focus();
     searchInput.select();

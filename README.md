@@ -11,7 +11,7 @@ Simple no-login note-taking web app with syntax highlighting. Paste text, pick a
 - Full-text search (PostgreSQL-backed with ranked results)
 - Light / dark theme (Catppuccin Mocha & Latte palettes, persisted in localStorage)
 - Copy to clipboard
-- Keyboard shortcuts: Ctrl+N (new), Ctrl+S (save), Ctrl+P (preview), Ctrl+Shift+C (copy), Ctrl+F (search), Escape (close/clear)
+- Keyboard shortcuts: Alt+N (new), Alt+S (save), Alt+P (preview), Alt+C (copy), Alt+F (search), Escape (close/clear)
 - Offline resilience with localStorage queue that syncs when reconnected
 - Health check endpoint at `GET /health`
 
