@@ -58,10 +58,10 @@ window.EditorBridge = (function() {
         borderLeftColor: "#f5e0dc"
       },
       "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection": {
-        backgroundColor: "#45475a"
+        backgroundColor: "rgba(203, 166, 247, 0.30)"
       },
       ".cm-activeLine": {
-        backgroundColor: "#313244"
+        backgroundColor: "rgba(49, 50, 68, 0.5)"
       },
       ".cm-gutters": {
         backgroundColor: "#1e1e2e",
@@ -92,10 +92,10 @@ window.EditorBridge = (function() {
         borderLeftColor: "#dc8a78"
       },
       "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection": {
-        backgroundColor: "#acb0be"
+        backgroundColor: "rgba(136, 57, 239, 0.25)"
       },
       ".cm-activeLine": {
-        backgroundColor: "#e6e9ef"
+        backgroundColor: "rgba(230, 233, 239, 0.5)"
       },
       ".cm-gutters": {
         backgroundColor: "#eff1f5",
