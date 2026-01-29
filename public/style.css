@@ -90,7 +90,7 @@ body:has(.offline-banner:not(.hidden)) .layout {
   outline: none;
 }
 #search-input:focus-visible { border-color: #cba6f7; outline: 1px solid #cba6f7; }
-#search-input::placeholder { color: #6c7086; }
+#search-input::placeholder { color: #9399b2; }
 
 #note-list {
   list-style: none;

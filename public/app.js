@@ -71,8 +71,18 @@ async function flushQueue() {
             method: "POST",
             body: JSON.stringify(entry.data),
           });
-          if (currentNoteId === entry.tempId && created) {
-            currentNoteId = created.id;
+          if (created) {
+            // Rewrite any subsequent queued operations that reference the temp ID
+            const tempId = entry.tempId;
+            const realId = created.id;
+            if (currentNoteId === tempId) {
+              currentNoteId = realId;
+            }
+            for (let i = 1; i < q.length; i++) {
+              if (q[i].noteId === tempId) {
+                q[i].noteId = realId;
+              }
+            }
           }
         }
         q.shift();
@@ -162,6 +172,7 @@ function renderNoteList(notes) {
   if (!filtered.length) {
     const p = document.createElement("li");
     p.className = "note-list-empty";
+    p.setAttribute("role", "presentation");
     p.textContent = searchQuery ? "No matching notes" : "No notes yet";
     noteList.appendChild(p);
     return;
@@ -442,9 +453,13 @@ document.addEventListener("keydown", (e) => {
       return;
     }
     if (currentNoteId) {
-      currentNoteId = null;
-      hideEditor();
-      renderNoteList(lastNotes);
+      // Flush any pending debounced save before closing
+      clearTimeout(saveTimeout);
+      saveNote().then(() => {
+        currentNoteId = null;
+        hideEditor();
+        renderNoteList(lastNotes);
+      });
     }
     return;
   }
