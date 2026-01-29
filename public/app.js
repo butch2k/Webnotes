@@ -12,6 +12,7 @@ const btnCopy = document.getElementById("btn-copy");
 const btnExport = document.getElementById("btn-export");
 const btnDelete = document.getElementById("btn-delete");
 const btnPin = document.getElementById("btn-pin");
+const btnWrap = document.getElementById("btn-wrap");
 const btnTheme = document.getElementById("btn-theme");
 const btnHistory = document.getElementById("btn-history");
 const themeIcon = document.getElementById("theme-icon");
@@ -58,6 +59,7 @@ let selectedIds = new Set();
 let currentVersions = [];
 let selectedVersionIdx = -1;
 let suppressUpdate = false;
+let lineWrap = localStorage.getItem("webnotes_line_wrap") !== "false";
 
 // === Theme ===
 const THEME_KEY = "webnotes_theme";
@@ -92,7 +94,12 @@ function setTheme(theme) {
 }
 
 function toggleTheme() {
-  setTheme(getTheme() === "dark" ? "light" : "dark");
+  const newTheme = getTheme() === "dark" ? "light" : "dark";
+  setTheme(newTheme);
+  if (typeof mermaid !== "undefined") {
+    mermaid.initialize({ startOnLoad: false, theme: newTheme === "dark" ? "dark" : "default" });
+  }
+  if (previewing) updatePreview();
 }
 
 // === Offline queue (localStorage-backed) ===
@@ -1080,11 +1087,52 @@ function renderMarkdown(src) {
     return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   }
 
-  const lines = src.split("\n");
+  // --- Pre-pass: extract footnote definitions ---
+  const footnotes = {};
+  const srcLines = src.split("\n");
+  const filteredLines = [];
+  for (let fi = 0; fi < srcLines.length; fi++) {
+    const fnDef = srcLines[fi].match(/^\[\^(\w+)\]:\s+(.+)/);
+    if (fnDef) {
+      footnotes[fnDef[1]] = fnDef[2];
+    } else {
+      filteredLines.push(srcLines[fi]);
+    }
+  }
+
+  // --- Pre-pass: extract block math $$...$$ ---
+  const mathBlocks = [];
+  let srcText = filteredLines.join("\n");
+  srcText = srcText.replace(/\$\$([\s\S]+?)\$\$/g, (_, math) => {
+    const idx = mathBlocks.length;
+    mathBlocks.push(math);
+    return "\x00MATHBLOCK" + idx + "\x00";
+  });
+
+  const lines = srcText.split("\n");
   const out = [];
   let i = 0;
   let inList = false;
   let listType = "";
+
+  // --- Pre-scan headings for TOC ---
+  const headings = [];
+  const slugCounts = {};
+  for (const ln of lines) {
+    const hm = ln.match(/^(#{1,6})\s+(.+)/);
+    if (hm) {
+      const text = hm[2].replace(/[*_`~\[\]]/g, "");
+      let slug = text.toLowerCase().replace(/[^\w\s-]/g, "").replace(/\s+/g, "-");
+      if (slugCounts[slug] !== undefined) {
+        slugCounts[slug]++;
+        slug += "-" + slugCounts[slug];
+      } else {
+        slugCounts[slug] = 0;
+      }
+      headings.push({ level: hm[1].length, text, slug });
+    }
+  }
+  let headingIdx = 0;
 
   function closeList() {
     if (inList) {
@@ -1094,13 +1142,13 @@ function renderMarkdown(src) {
   }
 
   function inline(text) {
-    // Sanitize URLs — allowlist: only http(s) and relative paths
+    // Sanitize URLs — allowlist: only http(s), relative paths, and data:image URIs
     function safeUrl(url) {
       const decoded = url.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').trim();
       if (/^\s/.test(url)) return null;
       if (/^https?:\/\//i.test(decoded)) return url;
       if (/^[/#.]/.test(decoded)) return url;
-      // Block everything else (javascript:, data:, vbscript:, etc.)
+      if (/^data:image\//i.test(decoded)) return url;
       return null;
     }
     text = text.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, url) => {
@@ -1111,6 +1159,13 @@ function renderMarkdown(src) {
       const safe = safeUrl(url);
       return safe ? '<a href="' + safe + '" rel="noopener">' + label + '</a>' : label;
     });
+    // Footnote references [^ref]
+    text = text.replace(/\[\^(\w+)\]/g, (_, ref) => {
+      if (footnotes[ref]) {
+        return '<sup><a href="#fn-' + esc(ref) + '" class="footnote-ref" id="fnref-' + esc(ref) + '">' + esc(ref) + '</a></sup>';
+      }
+      return '[^' + esc(ref) + ']';
+    });
     text = text.replace(/\*\*\*(.+?)\*\*\*/g, "<strong><em>$1</em></strong>");
     text = text.replace(/___(.+?)___/g, "<strong><em>$1</em></strong>");
     text = text.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
@@ -1119,11 +1174,53 @@ function renderMarkdown(src) {
     text = text.replace(/_(.+?)_/g, "<em>$1</em>");
     text = text.replace(/~~(.+?)~~/g, "<del>$1</del>");
     text = text.replace(/`([^`]+)`/g, "<code>$1</code>");
+    // Inline math $...$  (not $$)
+    text = text.replace(/(?<!\$)\$(?!\$)([^\$\n]+?)\$(?!\$)/g, (_, math) => {
+      if (typeof katex !== "undefined") {
+        try {
+          return katex.renderToString(math.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"'), { throwOnError: false });
+        } catch (e) { return '<code>' + esc(math) + '</code>'; }
+      }
+      return '$' + math + '$';
+    });
     return text;
   }
 
   while (i < lines.length) {
     const line = lines[i];
+
+    // Math block placeholder
+    const mathPlaceholder = line.match(/^\x00MATHBLOCK(\d+)\x00$/);
+    if (mathPlaceholder) {
+      closeList();
+      const math = mathBlocks[parseInt(mathPlaceholder[1])];
+      if (typeof katex !== "undefined") {
+        try {
+          out.push(katex.renderToString(math.trim(), { throwOnError: false, displayMode: true }));
+        } catch (e) { out.push('<pre><code>' + esc(math) + '</code></pre>'); }
+      } else {
+        out.push('<pre><code>' + esc(math) + '</code></pre>');
+      }
+      i++;
+      continue;
+    }
+
+    // TOC placeholder
+    if (/^\[TOC\]\s*$/i.test(line)) {
+      closeList();
+      if (headings.length > 0) {
+        let tocHtml = '<nav class="toc"><strong>Table of Contents</strong><ul>';
+        const minLevel = Math.min(...headings.map(h => h.level));
+        for (const h of headings) {
+          const indent = h.level - minLevel;
+          tocHtml += '<li style="margin-left:' + (indent * 1.2) + 'em"><a href="#' + h.slug + '">' + esc(h.text) + '</a></li>';
+        }
+        tocHtml += '</ul></nav>';
+        out.push(tocHtml);
+      }
+      i++;
+      continue;
+    }
 
     // Fenced code block
     const fenceMatch = line.match(/^```(\w*)/);
@@ -1138,6 +1235,11 @@ function renderMarkdown(src) {
       }
       i++; // skip closing ```
       const codeRaw = codeLines.join("\n");
+      // Mermaid diagram
+      if (lang === "mermaid") {
+        out.push('<div class="mermaid">' + esc(codeRaw) + '</div>');
+        continue;
+      }
       let codeHtml = esc(codeRaw);
       if (lang && typeof hljs !== "undefined" && hljs.getLanguage(lang)) {
         codeHtml = hljs.highlight(codeRaw, { language: lang }).value;
@@ -1151,7 +1253,9 @@ function renderMarkdown(src) {
     if (headingMatch) {
       closeList();
       const level = headingMatch[1].length;
-      out.push("<h" + level + ">" + inline(esc(headingMatch[2])) + "</h" + level + ">");
+      const slug = headingIdx < headings.length ? headings[headingIdx].slug : "";
+      headingIdx++;
+      out.push('<h' + level + ' id="' + slug + '">' + inline(esc(headingMatch[2])) + '</h' + level + '>');
       i++;
       continue;
     }
@@ -1176,8 +1280,8 @@ function renderMarkdown(src) {
       continue;
     }
 
-    // Unordered list
-    const ulMatch = line.match(/^[\-\*\+]\s+(.+)/);
+    // Unordered list (with task list support)
+    const ulMatch = line.match(/^[\-\*\+]\s+(.*)/);
     if (ulMatch) {
       if (!inList || listType !== "ul") {
         closeList();
@@ -1185,7 +1289,15 @@ function renderMarkdown(src) {
         inList = true;
         listType = "ul";
       }
-      out.push("<li>" + inline(esc(ulMatch[1])) + "</li>");
+      const content = ulMatch[1];
+      // Task list: - [ ] or - [x]
+      const taskMatch = content.match(/^\[([ xX])\]\s*(.*)/);
+      if (taskMatch) {
+        const checked = taskMatch[1].toLowerCase() === 'x' ? ' checked' : '';
+        out.push('<li class="task-list-item"><input type="checkbox" disabled' + checked + '> ' + inline(esc(taskMatch[2])) + '</li>');
+      } else {
+        out.push("<li>" + inline(esc(content)) + "</li>");
+      }
       i++;
       continue;
     }
@@ -1258,6 +1370,17 @@ function renderMarkdown(src) {
   }
 
   closeList();
+
+  // Append footnotes section
+  const fnKeys = Object.keys(footnotes);
+  if (fnKeys.length > 0) {
+    out.push('<section class="footnotes"><hr><ol>');
+    for (const key of fnKeys) {
+      out.push('<li id="fn-' + esc(key) + '">' + inline(esc(footnotes[key])) + ' <a href="#fnref-' + esc(key) + '" class="footnote-backref">↩</a></li>');
+    }
+    out.push('</ol></section>');
+  }
+
   return out.join("\n");
 }
 
@@ -1298,7 +1421,10 @@ function sanitizeHtml(html) {
     for (const attr of [...n.attributes]) {
       if (attr.name.startsWith("on")) n.removeAttribute(attr.name);
       if ((attr.name === "href" || attr.name === "src" || attr.name === "action") &&
-          /^\s*(javascript|data|vbscript):/i.test(attr.value)) {
+          /^\s*(javascript|vbscript):/i.test(attr.value)) {
+        n.removeAttribute(attr.name);
+      }
+      if (attr.name === "src" && /^\s*data:/i.test(attr.value) && !/^\s*data:image\//i.test(attr.value)) {
         n.removeAttribute(attr.name);
       }
     }
@@ -1316,6 +1442,14 @@ function updatePreview() {
     mdPreviewEl.classList.remove("hidden");
     const rendered = renderMarkdown(content);
     mdPreviewEl.innerHTML = sanitizeHtml(rendered);
+    // Render mermaid diagrams
+    if (typeof mermaid !== "undefined") {
+      const mermaidEls = mdPreviewEl.querySelectorAll(".mermaid");
+      if (mermaidEls.length > 0) {
+        mermaidEls.forEach(el => { el.removeAttribute("data-processed"); });
+        try { mermaid.run({ nodes: mermaidEls }); } catch (e) { console.warn("Mermaid render error:", e); }
+      }
+    }
     return;
   }
 
@@ -1723,6 +1857,39 @@ fileInput.addEventListener("change", () => {
 btnNew.addEventListener("click", createNote);
 btnDelete.addEventListener("click", deleteNote);
 btnPreview.addEventListener("click", togglePreview);
+// Wrap toggle
+btnWrap.classList.toggle("active", lineWrap);
+btnWrap.setAttribute("aria-pressed", String(lineWrap));
+btnWrap.addEventListener("click", () => {
+  lineWrap = !lineWrap;
+  localStorage.setItem("webnotes_line_wrap", String(lineWrap));
+  btnWrap.classList.toggle("active", lineWrap);
+  btnWrap.setAttribute("aria-pressed", String(lineWrap));
+  window.EditorBridge.setLineWrapping(lineWrap);
+});
+// Paste image as data URI in markdown mode
+document.addEventListener("paste", (e) => {
+  if (!isMarkdownMode() || !currentNoteId) return;
+  const items = e.clipboardData && e.clipboardData.items;
+  if (!items) return;
+  for (const item of items) {
+    if (item.type.startsWith("image/")) {
+      e.preventDefault();
+      const blob = item.getAsFile();
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = reader.result;
+        const v = window.EditorBridge.getView();
+        if (v) {
+          const pos = v.state.selection.main.head;
+          v.dispatch({ changes: { from: pos, insert: "![pasted-image](" + dataUrl + ")" } });
+        }
+      };
+      reader.readAsDataURL(blob);
+      break;
+    }
+  }
+});
 btnCopy.addEventListener("click", copyToClipboard);
 btnExport.addEventListener("click", exportNote);
 btnPin.addEventListener("click", togglePin);
@@ -1815,6 +1982,10 @@ window.addEventListener("beforeunload", (e) => {
 
 // === Init ===
 setTheme(getTheme());
+// Initialize Mermaid
+if (typeof mermaid !== "undefined") {
+  mermaid.initialize({ startOnLoad: false, theme: getTheme() === "dark" ? "dark" : "default" });
+}
 setOnline(navigator.onLine);
 loadNotes();
 loadTags();
@@ -1824,3 +1995,4 @@ setupDragDrop(contentAreaContainer);
 
 // Initialize CodeMirror editor
 window.EditorBridge.init(contentAreaContainer, "", getTheme() === "dark");
+if (!lineWrap) window.EditorBridge.setLineWrapping(false);
