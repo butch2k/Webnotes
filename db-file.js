@@ -87,14 +87,14 @@ async function getNote(id) {
   return notes.find((n) => n.id === Number(id)) || null;
 }
 
-async function createNote({ title, content, language, tags }) {
+async function createNote({ title, content, language, tags, pinned }) {
   const now = new Date().toISOString();
   const note = {
     id: nextId++,
     title: title || "Untitled",
     content: content || "",
     language: language || "plaintext",
-    pinned: false,
+    pinned: pinned || false,
     tags: Array.isArray(tags) ? tags.filter(Boolean) : [],
     created_at: now,
     updated_at: now,
@@ -215,7 +215,19 @@ async function healthCheck() {
   return { status: "ok", db: "file" };
 }
 
+// Test helper to reset module state (only exported for tests)
+function resetForTesting() {
+  notes = [];
+  nextId = 1;
+  versions = {};
+  if (saveTimer) {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+  }
+}
+
 module.exports = {
   initDb, listNotes, listTags, getNote, createNote, updateNote, deleteNote,
   healthCheck, renameTag, deleteTag, bulkDelete, bulkTag, getVersions,
+  resetForTesting,
 };
