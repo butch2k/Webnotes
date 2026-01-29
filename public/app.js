@@ -1,3 +1,12 @@
+// Prevent hljs "already highlighted" warnings by patching highlightElement
+if (typeof hljs !== "undefined") {
+  const origHighlightElement = hljs.highlightElement.bind(hljs);
+  hljs.highlightElement = function(el) {
+    delete el.dataset.highlighted;
+    origHighlightElement(el);
+  };
+}
+
 const noteList = document.getElementById("note-list");
 const editorArea = document.getElementById("editor-area");
 const emptyState = document.getElementById("empty-state");
@@ -709,7 +718,7 @@ function renderMarkdown(src) {
           codeHtml = hljs.highlight(codeRaw, { language: lang }).value;
         } catch { /* ignore unknown language */ }
       }
-      out.push('<pre><code class="' + (lang ? "language-" + esc(lang) : "") + '" data-highlighted="yes">' + codeHtml + "</code></pre>");
+      out.push('<pre><code class="' + (lang ? "language-" + esc(lang) : "") + ">' + codeHtml + "</code></pre>");
       continue;
     }
 
@@ -814,8 +823,6 @@ function updatePreview() {
   if (isMarkdownMode()) {
     previewEl.classList.add("hidden");
     mdPreviewEl.classList.remove("hidden");
-    // Clear highlighted flags before replacing content
-    mdPreviewEl.querySelectorAll("code[data-highlighted]").forEach((el) => delete el.dataset.highlighted);
     mdPreviewEl.innerHTML = renderMarkdown(contentArea.value);
     return;
   }
@@ -824,7 +831,6 @@ function updatePreview() {
   previewEl.classList.remove("hidden");
 
   const code = previewEl.querySelector("code");
-  delete code.dataset.highlighted;
   code.textContent = contentArea.value;
   code.className = "";
   previewEl.classList.remove("line-numbers");
