@@ -424,7 +424,7 @@ function addLineNumbers(codeEl) {
   if (lines.length > 1 && lines[lines.length - 1] === "") lines.pop();
   codeEl.innerHTML = lines
     .map((line) => `<span class="line">${line || " "}</span>`)
-    .join("\n");
+    .join("");
 }
 
 // === UI helpers ===
