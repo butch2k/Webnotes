@@ -9,15 +9,23 @@ let nextId = 1;
 
 function load() {
   if (fs.existsSync(DB_FILE)) {
-    const raw = fs.readFileSync(DB_FILE, "utf8");
-    const data = JSON.parse(raw);
-    notes = data.notes || [];
-    nextId = data.nextId || 1;
+    try {
+      const raw = fs.readFileSync(DB_FILE, "utf8");
+      const data = JSON.parse(raw);
+      notes = Array.isArray(data.notes) ? data.notes : [];
+      nextId = data.nextId || 1;
+    } catch (err) {
+      console.warn("Corrupted data file, starting fresh:", err.message);
+      notes = [];
+      nextId = 1;
+    }
   }
 }
 
 function save() {
-  fs.writeFileSync(DB_FILE, JSON.stringify({ notes, nextId }, null, 2));
+  const tmp = DB_FILE + ".tmp";
+  fs.writeFileSync(tmp, JSON.stringify({ notes, nextId }, null, 2));
+  fs.renameSync(tmp, DB_FILE);
 }
 
 async function initDb() {
@@ -64,9 +72,9 @@ async function createNote({ title, content, language }) {
 async function updateNote(id, { title, content, language }) {
   const note = notes.find((n) => n.id === Number(id));
   if (!note) return null;
-  note.title = title;
-  note.content = content;
-  note.language = language;
+  if (title !== undefined) note.title = title;
+  if (content !== undefined) note.content = content;
+  if (language !== undefined) note.language = language;
   note.updated_at = new Date().toISOString();
   save();
   return note;

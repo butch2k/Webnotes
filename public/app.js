@@ -46,6 +46,7 @@ function setTheme(theme) {
   }
 
   themeIcon.textContent = theme === "dark" ? "\u2600" : "\u263E";
+  btnTheme.setAttribute("aria-label", theme === "dark" ? "Switch to light theme" : "Switch to dark theme");
 
   // Re-render preview if open
   if (previewing) updatePreview();

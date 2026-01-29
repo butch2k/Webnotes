@@ -77,9 +77,13 @@ async function createNote({ title, content, language }) {
 
 async function updateNote(id, { title, content, language }) {
   const { rows } = await pool.query(
-    `UPDATE notes SET title = $1, content = $2, language = $3, updated_at = NOW()
+    `UPDATE notes SET
+       title = COALESCE($1, title),
+       content = COALESCE($2, content),
+       language = COALESCE($3, language),
+       updated_at = NOW()
      WHERE id = $4 RETURNING *`,
-    [title, content, language, id]
+    [title !== undefined ? title : null, content !== undefined ? content : null, language !== undefined ? language : null, id]
   );
   return rows[0] || null;
 }
