@@ -140,9 +140,20 @@ async function start() {
     console.log("Storage: file system");
   }
 
-  app.listen(PORT, () =>
+  const server = app.listen(PORT, () =>
     console.log(`Webnotes running on http://localhost:${PORT}`)
   );
+
+  function shutdown(signal) {
+    console.log(`${signal} received, shutting down...`);
+    server.close(() => {
+      if (db.close) db.close().then(() => process.exit(0)).catch(() => process.exit(1));
+      else process.exit(0);
+    });
+    setTimeout(() => process.exit(1), 5000);
+  }
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
 }
 
 start().catch((err) => {

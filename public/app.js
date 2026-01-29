@@ -285,6 +285,14 @@ function renderNoteList(notes) {
       if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
         openNote(n.id);
+      } else if (e.key === "ArrowDown") {
+        e.preventDefault();
+        const next = li.nextElementSibling;
+        if (next && next.getAttribute("role") === "option") next.focus();
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        const prev = li.previousElementSibling;
+        if (prev && prev.getAttribute("role") === "option") prev.focus();
       }
     };
     noteList.appendChild(li);
@@ -489,6 +497,7 @@ async function deleteNote() {
   currentNoteId = null;
   hideEditor();
   loadNotes();
+  btnNew.focus();
 }
 
 // === Copy to clipboard ===
@@ -589,7 +598,7 @@ function detectLanguage(filename) {
 }
 
 function handleFileDrop(file) {
-  if (!file.type.startsWith("text/") && file.size > 5 * 1024 * 1024) {
+  if (file.size > 5 * 1024 * 1024) {
     alert("File too large (max 5 MB)");
     return;
   }
@@ -597,6 +606,9 @@ function handleFileDrop(file) {
   reader.onload = () => {
     const lang = detectLanguage(file.name);
     createNoteFromFile(file.name, reader.result, lang);
+  };
+  reader.onerror = () => {
+    alert("Could not read file");
   };
   reader.readAsText(file);
 }
@@ -645,9 +657,14 @@ function escapeHtml(s) {
   return d.innerHTML;
 }
 
-// Handle tab key in textarea
+// Handle tab key in textarea (Escape releases the tab trap)
+let tabTrapped = true;
 contentArea.addEventListener("keydown", (e) => {
-  if (e.key === "Tab") {
+  if (e.key === "Escape") {
+    tabTrapped = false;
+    return;
+  }
+  if (e.key === "Tab" && tabTrapped) {
     e.preventDefault();
     const start = contentArea.selectionStart;
     const end = contentArea.selectionEnd;
@@ -657,6 +674,7 @@ contentArea.addEventListener("keydown", (e) => {
     scheduleSave();
   }
 });
+contentArea.addEventListener("focus", () => { tabTrapped = true; });
 
 // === Keyboard shortcuts ===
 document.addEventListener("keydown", (e) => {

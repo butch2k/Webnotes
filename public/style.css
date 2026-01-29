@@ -390,6 +390,14 @@ body:has(.offline-banner:not(.hidden)) .layout {
 }
 .save-indicator.show { opacity: 1; }
 
+/* === Reduced motion === */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+
 /* === Print styles === */
 @media print {
   body {

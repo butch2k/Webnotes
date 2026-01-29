@@ -8,6 +8,10 @@ const pool = new Pool({
   database: process.env.PGDATABASE || "webnotes",
 });
 
+pool.on("error", (err) => {
+  console.error("Unexpected database pool error:", err.message);
+});
+
 async function initDb() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS notes (
@@ -121,4 +125,8 @@ async function healthCheck() {
   return { status: "ok", db: "connected" };
 }
 
-module.exports = { initDb, listNotes, getNote, createNote, updateNote, deleteNote, healthCheck };
+async function close() {
+  await pool.end();
+}
+
+module.exports = { initDb, listNotes, getNote, createNote, updateNote, deleteNote, healthCheck, close };
