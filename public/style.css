@@ -148,9 +148,11 @@ body:has(.offline-banner:not(.hidden)) .layout {
 }
 
 #btn-theme {
-  padding: 6px 8px;
+  width: 36px;
+  padding: 6px 0;
   font-size: 16px;
   line-height: 1;
+  text-align: center;
 }
 
 #btn-new {

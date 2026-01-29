@@ -123,14 +123,21 @@ function getCachedNotes() {
   try { return JSON.parse(localStorage.getItem(CACHE_KEY)) || []; }
   catch { return []; }
 }
+let _cacheWritePending = null;
 function setCachedNotes(notes) {
-  try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify(notes));
-  } catch (err) {
-    if (err.name === "QuotaExceededError") {
-      console.warn("localStorage quota exceeded for cached notes");
-    }
+  if (_cacheWritePending !== null) {
+    cancelAnimationFrame(_cacheWritePending);
   }
+  _cacheWritePending = requestAnimationFrame(() => {
+    _cacheWritePending = null;
+    try {
+      localStorage.setItem(CACHE_KEY, JSON.stringify(notes));
+    } catch (err) {
+      if (err.name === "QuotaExceededError") {
+        console.warn("localStorage quota exceeded for cached notes");
+      }
+    }
+  });
 }
 
 function enqueue(entry) {
@@ -628,6 +635,7 @@ function renderNoteList(notes) {
     noteList.appendChild(p);
     return;
   }
+  const fragment = document.createDocumentFragment();
   sorted.forEach((n) => {
     const li = document.createElement("li");
     li.setAttribute("role", "option");
@@ -737,8 +745,9 @@ function renderNoteList(notes) {
         if (prev && prev.getAttribute("role") === "option") prev.focus();
       }
     };
-    noteList.appendChild(li);
+    fragment.appendChild(li);
   });
+  noteList.appendChild(fragment);
 }
 
 // === Open / Create / Save / Delete ===
@@ -1707,10 +1716,10 @@ function flashSaved(text) {
   setTimeout(() => saveIndicator.classList.remove("show"), 1500);
 }
 
+const _escapeEl = document.createElement("div");
 function escapeHtml(s) {
-  const d = document.createElement("div");
-  d.textContent = s;
-  return d.innerHTML;
+  _escapeEl.textContent = s;
+  return _escapeEl.innerHTML;
 }
 
 // === Mobile sidebar ===
@@ -1925,10 +1934,16 @@ btnTheme.addEventListener("click", toggleTheme);
 titleInput.addEventListener("input", scheduleSave);
 
 // Setup editor update callback
+let statsTimeout = null;
+function scheduleUpdateStats() {
+  clearTimeout(statsTimeout);
+  statsTimeout = setTimeout(updateStats, 300);
+}
+
 window.EditorBridge.onUpdate(() => {
   if (suppressUpdate) return;
   scheduleSave();
-  updateStats();
+  scheduleUpdateStats();
 });
 
 langSelect.addEventListener("change", () => {

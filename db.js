@@ -6,6 +6,9 @@ const pool = new Pool({
   user: process.env.PGUSER || "postgres",
   password: process.env.PGPASSWORD || "postgres",
   database: process.env.PGDATABASE || "webnotes",
+  max: 20,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 2000,
 });
 
 pool.on("error", (err) => {
@@ -100,6 +103,14 @@ async function initDb() {
 
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_note_versions_note_id ON note_versions(note_id)
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_notes_pinned_updated ON notes(pinned DESC, updated_at DESC)
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_note_versions_note_id_saved ON note_versions(note_id, saved_at DESC)
   `);
 }
 
@@ -256,10 +267,9 @@ async function bulkDelete(ids) {
   if (numericIds.some((id) => !Number.isFinite(id) || id <= 0)) {
     throw new Error("Invalid id format");
   }
-  const placeholders = numericIds.map((_, i) => `$${i + 1}`).join(",");
   const { rowCount } = await pool.query(
-    `DELETE FROM notes WHERE id IN (${placeholders})`,
-    numericIds
+    `DELETE FROM notes WHERE id = ANY($1::int[])`,
+    [numericIds]
   );
   return rowCount;
 }
@@ -270,10 +280,9 @@ async function bulkTag(ids, tag) {
   if (numericIds.some((id) => !Number.isFinite(id) || id <= 0)) {
     throw new Error("Invalid id format");
   }
-  const placeholders = numericIds.map((_, i) => `$${i + 2}`).join(",");
   const { rowCount } = await pool.query(
-    `UPDATE notes SET tags = CASE WHEN NOT ($1 = ANY(tags)) THEN array_append(tags, $1) ELSE tags END, updated_at = NOW() WHERE id IN (${placeholders})`,
-    [tag, ...numericIds]
+    `UPDATE notes SET tags = CASE WHEN NOT ($1 = ANY(tags)) THEN array_append(tags, $1) ELSE tags END, updated_at = NOW() WHERE id = ANY($2::int[])`,
+    [tag, numericIds]
   );
   return rowCount;
 }

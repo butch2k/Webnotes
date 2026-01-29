@@ -1,5 +1,6 @@
 require("dotenv").config();
 const express = require("express");
+const compression = require("compression");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 const path = require("path");
@@ -14,6 +15,8 @@ let db;
  * @param {Object} dbModule - Database module with methods like initDb, createNote, etc.
  * @returns {Object} Configured Express app
  */
+const ID_RE = /^\d+$/;
+
 function createApp(dbModule) {
   db = dbModule;
   const app = express();
@@ -54,7 +57,8 @@ function createApp(dbModule) {
     message: { error: "Too many write requests, please try again later" },
   });
 
-  app.use(express.json({ limit: "5mb" }));
+  app.use(compression());
+  app.use(express.json({ limit: "1.5mb" }));
   app.use(express.static(path.join(__dirname, "public")));
   app.use("/api/", apiLimiter);
 
@@ -107,7 +111,7 @@ function createApp(dbModule) {
   }
 
   function validateId(req, res, next) {
-    if (!/^\d+$/.test(req.params.id))
+    if (!ID_RE.test(req.params.id))
       return res.status(400).json({ error: "invalid id" });
     next();
   }
