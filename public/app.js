@@ -709,7 +709,7 @@ function renderMarkdown(src) {
           codeHtml = hljs.highlight(codeRaw, { language: lang }).value;
         } catch { /* ignore unknown language */ }
       }
-      out.push('<pre><code class="' + (lang ? "language-" + esc(lang) : "") + '">' + codeHtml + "</code></pre>");
+      out.push('<pre><code class="' + (lang ? "language-" + esc(lang) : "") + '" data-highlighted="yes">' + codeHtml + "</code></pre>");
       continue;
     }
 
