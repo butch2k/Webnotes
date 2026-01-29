@@ -198,6 +198,9 @@ body:has(.offline-banner:not(.hidden)) .layout {
 .nb-tab:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
 .nb-tab:focus:not(:focus-visible) { outline: none; }
 
+.notebook-wrapper {
+  position: relative;
+}
 #note-notebook {
   background: var(--bg-input);
   border: 1px solid var(--border-input);
@@ -207,6 +210,36 @@ body:has(.offline-banner:not(.hidden)) .layout {
   font-size: 13px;
   outline: none;
   width: 120px;
+}
+.nb-suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin: 4px 0 0;
+  padding: 4px 0;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-input);
+  border-radius: 6px;
+  list-style: none;
+  z-index: 10;
+  max-height: 160px;
+  overflow-y: auto;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+.nb-suggestions li {
+  padding: 6px 10px;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--text-primary);
+}
+.nb-suggestions li:hover,
+.nb-suggestions li.active {
+  background: var(--bg-hover);
+}
+.nb-suggestions li[aria-selected="true"] {
+  background: var(--accent);
+  color: var(--accent-on);
 }
 #note-notebook:focus { border-color: var(--accent); outline: 1px solid var(--accent); }
 #note-notebook:focus:not(:focus-visible) { outline: none; }

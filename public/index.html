@@ -107,8 +107,10 @@
             <option value="yaml">YAML</option>
           </select>
           <label for="note-notebook" class="sr-only">Notebook</label>
-          <input id="note-notebook" type="text" placeholder="Notebook…" list="notebook-list" title="Assign to notebook" aria-label="Notebook name">
-          <datalist id="notebook-list"></datalist>
+          <div class="notebook-wrapper">
+            <input id="note-notebook" type="text" placeholder="Notebook…" title="Assign to notebook" aria-label="Notebook name" autocomplete="off">
+            <ul id="notebook-suggestions" class="nb-suggestions hidden" role="listbox"></ul>
+          </div>
           <button id="btn-pin" class="toolbar-btn" title="Pin/unpin note" aria-pressed="false">Pin</button>
           <button id="btn-preview" class="toolbar-btn" title="Toggle syntax preview (Alt+P)" aria-pressed="false">Preview</button>
           <button id="btn-copy" class="toolbar-btn" title="Copy to clipboard (Alt+C)" aria-label="Copy to clipboard">Copy</button>

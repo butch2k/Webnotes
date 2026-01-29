@@ -21,7 +21,7 @@ const sortSelect = document.getElementById("sort-select");
 const statusStats = document.getElementById("status-stats");
 const dropZone = document.getElementById("drop-zone");
 const notebookInput = document.getElementById("note-notebook");
-const notebookList = document.getElementById("notebook-list");
+const notebookSuggestions = document.getElementById("notebook-suggestions");
 const notebookBar = document.getElementById("notebook-bar");
 
 let currentNoteId = null;
@@ -258,7 +258,7 @@ async function loadNotebooks() {
     notebooks = [];
   }
   renderNotebookTabs();
-  updateNotebookDatalist();
+  updateNotebookSuggestions();
 }
 
 function renderNotebookTabs() {
@@ -283,12 +283,25 @@ function renderNotebookTabs() {
   document.getElementById("nb-uncategorized").setAttribute("aria-pressed", String(currentNotebook === ""));
 }
 
-function updateNotebookDatalist() {
-  notebookList.innerHTML = "";
-  notebooks.forEach((nb) => {
-    const opt = document.createElement("option");
-    opt.value = nb.notebook;
-    notebookList.appendChild(opt);
+function updateNotebookSuggestions() {
+  const val = notebookInput.value.trim().toLowerCase();
+  const matches = notebooks.filter((nb) => nb.notebook.toLowerCase().includes(val));
+  notebookSuggestions.innerHTML = "";
+  if (!matches.length) {
+    notebookSuggestions.classList.add("hidden");
+    return;
+  }
+  matches.forEach((nb) => {
+    const li = document.createElement("li");
+    li.setAttribute("role", "option");
+    li.textContent = nb.notebook;
+    li.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      notebookInput.value = nb.notebook;
+      notebookSuggestions.classList.add("hidden");
+      notebookInput.dispatchEvent(new Event("change"));
+    });
+    notebookSuggestions.appendChild(li);
   });
 }
 
@@ -1053,6 +1066,18 @@ notebookInput.addEventListener("change", () => {
   saveTimeout = setTimeout(() => {
     saveNote().then(() => loadNotebooks());
   }, 600);
+});
+notebookInput.addEventListener("input", () => {
+  updateNotebookSuggestions();
+  notebookSuggestions.classList.remove("hidden");
+});
+notebookInput.addEventListener("focus", () => {
+  updateNotebookSuggestions();
+  notebookSuggestions.classList.remove("hidden");
+});
+notebookInput.addEventListener("blur", () => {
+  // Delay to allow mousedown on suggestion to fire first
+  setTimeout(() => notebookSuggestions.classList.add("hidden"), 150);
 });
 
 // === Unsaved changes warning ===
