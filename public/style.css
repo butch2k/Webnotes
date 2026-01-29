@@ -231,19 +231,56 @@ body:has(.offline-banner:not(.hidden)) .layout {
   color: var(--danger);
 }
 
-.notebook-wrapper {
+.tags-wrapper {
   position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
 }
-#note-notebook {
+.tag-chips {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: var(--bg-active);
+  color: var(--accent);
+  border: 1px solid var(--border-input);
+  border-radius: 12px;
+  padding: 2px 8px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.tag-chip-remove {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 1px;
+}
+.tag-chip-remove:hover {
+  color: var(--danger);
+}
+#tag-input {
   background: var(--bg-input);
   border: 1px solid var(--border-input);
   color: var(--text-primary);
-  padding: 8px 10px;
+  padding: 4px 8px;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: 12px;
   outline: none;
-  width: 120px;
+  width: 90px;
+  min-width: 60px;
 }
+#tag-input:focus { border-color: var(--accent); outline: 1px solid var(--accent); }
+#tag-input:focus:not(:focus-visible) { outline: none; }
+#tag-input::placeholder { color: var(--text-muted); }
 .nb-suggestions {
   position: absolute;
   top: 100%;
@@ -274,11 +311,11 @@ body:has(.offline-banner:not(.hidden)) .layout {
   background: var(--accent);
   color: var(--accent-on);
 }
-#note-notebook:focus { border-color: var(--accent); outline: 1px solid var(--accent); }
-#note-notebook:focus:not(:focus-visible) { outline: none; }
-#note-notebook::placeholder { color: var(--text-muted); }
 
-.note-item-nb {
+.note-item-tags {
+  display: inline;
+}
+.note-item-tag {
   color: var(--accent);
   font-size: 10px;
 }
@@ -881,10 +918,10 @@ body:has(.offline-banner:not(.hidden)) .layout {
     font-size: 12px;
     padding: 6px 8px;
   }
-  #note-notebook {
-    width: 90px;
-    font-size: 12px;
-    padding: 6px 8px;
+  #tag-input {
+    width: 70px;
+    font-size: 11px;
+    padding: 4px 6px;
   }
   .status-bar {
     flex-direction: column;

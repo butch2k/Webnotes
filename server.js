@@ -37,13 +37,17 @@ function validateNote(req, res, next) {
     return res.status(400).json({ error: "language too long (max 50)" });
   if (content && content.length > 1024 * 1024)
     return res.status(400).json({ error: "content too long (max 1 MB)" });
-  const { pinned, notebook } = req.body;
+  const { pinned, tags } = req.body;
   if (pinned !== undefined && typeof pinned !== "boolean")
     return res.status(400).json({ error: "pinned must be a boolean" });
-  if (notebook !== undefined && typeof notebook !== "string")
-    return res.status(400).json({ error: "notebook must be a string" });
-  if (notebook && notebook.length > 100)
-    return res.status(400).json({ error: "notebook too long (max 100)" });
+  if (tags !== undefined) {
+    if (!Array.isArray(tags))
+      return res.status(400).json({ error: "tags must be an array" });
+    if (tags.some((t) => typeof t !== "string" || t.length > 100))
+      return res.status(400).json({ error: "each tag must be a string (max 100)" });
+    if (tags.length > 20)
+      return res.status(400).json({ error: "too many tags (max 20)" });
+  }
   next();
 }
 
@@ -66,35 +70,35 @@ app.get("/health", async (req, res) => {
   }
 });
 
-// List notebooks
-app.get("/api/notebooks", async (req, res, next) => {
+// List tags
+app.get("/api/tags", async (req, res, next) => {
   try {
-    const notebooks = await db.listNotebooks();
-    res.json(notebooks);
+    const tags = await db.listTags();
+    res.json(tags);
   } catch (err) {
     next(err);
   }
 });
 
-// Rename notebook
-app.put("/api/notebooks/:name", async (req, res, next) => {
+// Rename tag
+app.put("/api/tags/:name", async (req, res, next) => {
   try {
     const oldName = req.params.name;
     const { newName } = req.body;
     if (!newName || typeof newName !== "string" || newName.length > 100) {
       return res.status(400).json({ error: "invalid newName" });
     }
-    const count = await db.renameNotebook(oldName, newName.trim());
+    const count = await db.renameTag(oldName, newName.trim());
     res.json({ updated: count });
   } catch (err) {
     next(err);
   }
 });
 
-// Delete notebook (unfile notes)
-app.delete("/api/notebooks/:name", async (req, res, next) => {
+// Delete tag (remove from all notes)
+app.delete("/api/tags/:name", async (req, res, next) => {
   try {
-    const count = await db.deleteNotebook(req.params.name);
+    const count = await db.deleteTag(req.params.name);
     res.json({ updated: count });
   } catch (err) {
     next(err);
@@ -105,8 +109,8 @@ app.delete("/api/notebooks/:name", async (req, res, next) => {
 app.get("/api/notes", async (req, res, next) => {
   try {
     const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
-    const notebook = typeof req.query.notebook === "string" ? req.query.notebook : undefined;
-    const notes = await db.listNotes(q || null, notebook);
+    const tag = typeof req.query.tag === "string" ? req.query.tag : undefined;
+    const notes = await db.listNotes(q || null, tag);
     res.json(notes);
   } catch (err) {
     next(err);
@@ -116,7 +120,7 @@ app.get("/api/notes", async (req, res, next) => {
 // Bulk operations
 app.post("/api/notes/bulk", async (req, res, next) => {
   try {
-    const { action, ids, notebook } = req.body;
+    const { action, ids, tag } = req.body;
     if (!Array.isArray(ids) || !ids.length) {
       return res.status(400).json({ error: "ids must be a non-empty array" });
     }
@@ -127,12 +131,12 @@ app.post("/api/notes/bulk", async (req, res, next) => {
       const count = await db.bulkDelete(ids);
       return res.json({ deleted: count });
     }
-    if (action === "move") {
-      if (typeof notebook !== "string") {
-        return res.status(400).json({ error: "notebook must be a string" });
+    if (action === "tag") {
+      if (typeof tag !== "string") {
+        return res.status(400).json({ error: "tag must be a string" });
       }
-      const count = await db.bulkMove(ids, notebook);
-      return res.json({ moved: count });
+      const count = await db.bulkTag(ids, tag);
+      return res.json({ tagged: count });
     }
     res.status(400).json({ error: "unknown action" });
   } catch (err) {

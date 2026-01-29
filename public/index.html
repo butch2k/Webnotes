@@ -60,15 +60,15 @@
           <option value="title-desc">Title Z–A</option>
         </select>
       </div>
-      <div id="notebook-bar" class="notebook-bar" role="toolbar" aria-label="Filter by notebook">
+      <div id="tag-bar" class="notebook-bar" role="toolbar" aria-label="Filter by tag">
         <button id="nb-all" class="nb-tab active" aria-pressed="true">All</button>
-        <button id="nb-uncategorized" class="nb-tab" aria-pressed="false">Unfiled</button>
+        <button id="nb-uncategorized" class="nb-tab" aria-pressed="false">Untagged</button>
       </div>
       <!-- Bulk actions bar -->
       <div id="bulk-bar" class="bulk-bar hidden">
         <label class="bulk-select-all"><input type="checkbox" id="bulk-select-all"> All</label>
         <span id="bulk-count">0 selected</span>
-        <button id="bulk-move" class="toolbar-btn bulk-btn" title="Move to notebook">Move</button>
+        <button id="bulk-tag" class="toolbar-btn bulk-btn" title="Add tag to selected">Tag</button>
         <button id="bulk-delete" class="toolbar-btn bulk-btn bulk-btn-danger" title="Delete selected">Delete</button>
         <button id="bulk-cancel" class="toolbar-btn bulk-btn" title="Cancel selection">Cancel</button>
       </div>
@@ -122,10 +122,11 @@
             <option value="xml">XML</option>
             <option value="yaml">YAML</option>
           </select>
-          <label for="note-notebook" class="sr-only">Notebook</label>
-          <div class="notebook-wrapper">
-            <input id="note-notebook" type="text" placeholder="Notebook…" title="Assign to notebook" aria-label="Notebook name" autocomplete="off">
-            <ul id="notebook-suggestions" class="nb-suggestions hidden" role="listbox"></ul>
+          <div class="tags-wrapper">
+            <div id="note-tags" class="tag-chips" aria-label="Tags"></div>
+            <label for="tag-input" class="sr-only">Add tag</label>
+            <input id="tag-input" type="text" placeholder="Add tag…" title="Add tag" aria-label="Add tag" autocomplete="off">
+            <ul id="tag-suggestions" class="nb-suggestions hidden" role="listbox"></ul>
           </div>
           <button id="btn-pin" class="toolbar-btn" title="Pin/unpin note" aria-pressed="false">Pin</button>
           <button id="btn-preview" class="toolbar-btn" title="Toggle syntax preview (Alt+P)" aria-pressed="false">Preview</button>

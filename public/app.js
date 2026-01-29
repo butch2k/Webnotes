@@ -22,9 +22,10 @@ const sortSelect = document.getElementById("sort-select");
 const statusStats = document.getElementById("status-stats");
 const statusTimestamps = document.getElementById("status-timestamps");
 const dropZone = document.getElementById("drop-zone");
-const notebookInput = document.getElementById("note-notebook");
-const notebookSuggestions = document.getElementById("notebook-suggestions");
-const notebookBar = document.getElementById("notebook-bar");
+const tagChipsEl = document.getElementById("note-tags");
+const tagInput = document.getElementById("tag-input");
+const tagSuggestions = document.getElementById("tag-suggestions");
+const tagBar = document.getElementById("tag-bar");
 const sidebar = document.getElementById("sidebar");
 const sidebarOverlay = document.getElementById("sidebar-overlay");
 const resizeHandle = document.getElementById("resize-handle");
@@ -41,7 +42,8 @@ let currentNoteId = null;
 let currentNotePinned = false;
 let currentNoteCreatedAt = null;
 let currentNoteUpdatedAt = null;
-let currentNotebook = null; // null = all, "" = unfiled, "name" = specific
+let currentNoteTags = []; // array of tag strings
+let currentFilterTag = null; // null = all, "" = untagged, "name" = specific tag
 let saveTimeout = null;
 let searchTimeout = null;
 let dirty = false;
@@ -229,7 +231,7 @@ async function serverSearch() {
   if (!searchQuery) return;
   try {
     const params = ["q=" + encodeURIComponent(searchQuery)];
-    if (currentNotebook !== null) params.push("notebook=" + encodeURIComponent(currentNotebook));
+    if (currentFilterTag !== null) params.push("tag=" + encodeURIComponent(currentFilterTag));
     const notes = await api("/notes?" + params.join("&"));
     if (searchQuery === searchInput.value.trim()) {
       lastNotes = notes;
@@ -257,7 +259,7 @@ function contentSnippet(content, query) {
   if (idx === -1) return "";
   const start = Math.max(0, idx - 30);
   const end = Math.min(content.length, idx + query.length + 60);
-  let snippet = (start > 0 ? "…" : "") + content.slice(start, end).replace(/\n/g, " ") + (end < content.length ? "…" : "");
+  let snippet = (start > 0 ? "\u2026" : "") + content.slice(start, end).replace(/\n/g, " ") + (end < content.length ? "\u2026" : "");
   return highlightText(snippet, query);
 }
 
@@ -290,46 +292,46 @@ sortSelect.addEventListener("change", () => {
   renderNoteList(lastNotes);
 });
 
-// === Notebooks ===
-let notebooks = [];
+// === Tags ===
+let allTags = [];
 
-async function loadNotebooks() {
+async function loadTags() {
   try {
-    notebooks = await api("/notebooks");
+    allTags = await api("/tags");
   } catch {
-    notebooks = [];
+    allTags = [];
   }
-  renderNotebookTabs();
-  updateNotebookSuggestions();
+  renderTagBar();
+  updateTagSuggestions();
 }
 
-function renderNotebookTabs() {
-  // Keep "All" and "Unfiled" buttons, remove dynamic tabs
-  const existing = notebookBar.querySelectorAll(".nb-tab-dynamic");
+function renderTagBar() {
+  // Keep "All" and "Untagged" buttons, remove dynamic tabs
+  const existing = tagBar.querySelectorAll(".nb-tab-dynamic");
   existing.forEach((el) => el.remove());
 
-  notebooks.forEach((nb) => {
+  allTags.forEach((t) => {
     const btn = document.createElement("button");
     btn.className = "nb-tab nb-tab-dynamic";
-    btn.textContent = nb.notebook + " (" + nb.count + ")";
-    btn.setAttribute("aria-pressed", currentNotebook === nb.notebook ? "true" : "false");
-    if (currentNotebook === nb.notebook) btn.classList.add("active");
-    btn.onclick = () => selectNotebook(nb.notebook);
-    btn.oncontextmenu = (e) => showNotebookContextMenu(e, nb.notebook);
-    notebookBar.appendChild(btn);
+    btn.textContent = t.tag + " (" + t.count + ")";
+    btn.setAttribute("aria-pressed", currentFilterTag === t.tag ? "true" : "false");
+    if (currentFilterTag === t.tag) btn.classList.add("active");
+    btn.onclick = () => selectFilterTag(t.tag);
+    btn.oncontextmenu = (e) => showTagContextMenu(e, t.tag);
+    tagBar.appendChild(btn);
   });
 
-  // Update All/Unfiled active state
-  document.getElementById("nb-all").classList.toggle("active", currentNotebook === null);
-  document.getElementById("nb-all").setAttribute("aria-pressed", String(currentNotebook === null));
-  document.getElementById("nb-uncategorized").classList.toggle("active", currentNotebook === "");
-  document.getElementById("nb-uncategorized").setAttribute("aria-pressed", String(currentNotebook === ""));
+  // Update All/Untagged active state
+  document.getElementById("nb-all").classList.toggle("active", currentFilterTag === null);
+  document.getElementById("nb-all").setAttribute("aria-pressed", String(currentFilterTag === null));
+  document.getElementById("nb-uncategorized").classList.toggle("active", currentFilterTag === "");
+  document.getElementById("nb-uncategorized").setAttribute("aria-pressed", String(currentFilterTag === ""));
 }
 
-// === Notebook context menu (rename/delete) ===
-function showNotebookContextMenu(e, nbName) {
+// === Tag context menu (rename/delete) ===
+function showTagContextMenu(e, tagName) {
   e.preventDefault();
-  closeNotebookContextMenu();
+  closeTagContextMenu();
   const menu = document.createElement("div");
   menu.className = "nb-ctx-menu";
   menu.style.left = e.clientX + "px";
@@ -338,31 +340,38 @@ function showNotebookContextMenu(e, nbName) {
   const renameBtn = document.createElement("button");
   renameBtn.textContent = "Rename";
   renameBtn.onclick = () => {
-    closeNotebookContextMenu();
-    const newName = prompt("Rename notebook \"" + nbName + "\" to:", nbName);
-    if (newName && newName.trim() && newName.trim() !== nbName) {
-      api("/notebooks/" + encodeURIComponent(nbName), {
+    closeTagContextMenu();
+    const newName = prompt("Rename tag \"" + tagName + "\" to:", tagName);
+    if (newName && newName.trim() && newName.trim() !== tagName) {
+      api("/tags/" + encodeURIComponent(tagName), {
         method: "PUT",
         body: JSON.stringify({ newName: newName.trim() }),
       }).then(() => {
-        if (currentNotebook === nbName) currentNotebook = newName.trim();
-        loadNotebooks();
+        if (currentFilterTag === tagName) currentFilterTag = newName.trim();
+        // Update current note tags if open
+        const idx = currentNoteTags.indexOf(tagName);
+        if (idx !== -1) currentNoteTags[idx] = newName.trim();
+        renderCurrentTags();
+        loadTags();
         loadNotes();
-      }).catch(() => alert("Failed to rename notebook"));
+      }).catch(() => alert("Failed to rename tag"));
     }
   };
 
   const deleteBtn = document.createElement("button");
   deleteBtn.className = "danger";
-  deleteBtn.textContent = "Delete notebook";
+  deleteBtn.textContent = "Delete tag";
   deleteBtn.onclick = () => {
-    closeNotebookContextMenu();
-    if (!confirm("Delete notebook \"" + nbName + "\"? Notes will be moved to Unfiled.")) return;
-    api("/notebooks/" + encodeURIComponent(nbName), { method: "DELETE" }).then(() => {
-      if (currentNotebook === nbName) currentNotebook = null;
-      loadNotebooks();
+    closeTagContextMenu();
+    if (!confirm("Delete tag \"" + tagName + "\"? It will be removed from all notes.")) return;
+    api("/tags/" + encodeURIComponent(tagName), { method: "DELETE" }).then(() => {
+      if (currentFilterTag === tagName) currentFilterTag = null;
+      // Update current note tags if open
+      currentNoteTags = currentNoteTags.filter((t) => t !== tagName);
+      renderCurrentTags();
+      loadTags();
       loadNotes();
-    }).catch(() => alert("Failed to delete notebook"));
+    }).catch(() => alert("Failed to delete tag"));
   };
 
   menu.appendChild(renameBtn);
@@ -371,45 +380,87 @@ function showNotebookContextMenu(e, nbName) {
 
   // Close on click outside
   setTimeout(() => {
-    document.addEventListener("click", closeNotebookContextMenu, { once: true });
+    document.addEventListener("click", closeTagContextMenu, { once: true });
   }, 0);
 }
 
-function closeNotebookContextMenu() {
+function closeTagContextMenu() {
   const existing = document.querySelector(".nb-ctx-menu");
   if (existing) existing.remove();
 }
 
-function updateNotebookSuggestions() {
-  const val = notebookInput.value.trim().toLowerCase();
-  const matches = notebooks.filter((nb) => nb.notebook.toLowerCase().includes(val));
-  notebookSuggestions.innerHTML = "";
+function updateTagSuggestions() {
+  const val = tagInput.value.trim().toLowerCase();
+  const matches = allTags.filter(
+    (t) => t.tag.toLowerCase().includes(val) && !currentNoteTags.includes(t.tag)
+  );
+  tagSuggestions.innerHTML = "";
   if (!matches.length) {
-    notebookSuggestions.classList.add("hidden");
+    tagSuggestions.classList.add("hidden");
     return;
   }
-  matches.forEach((nb) => {
+  matches.forEach((t) => {
     const li = document.createElement("li");
     li.setAttribute("role", "option");
-    li.textContent = nb.notebook;
+    li.textContent = t.tag;
     li.addEventListener("mousedown", (e) => {
       e.preventDefault();
-      notebookInput.value = nb.notebook;
-      notebookSuggestions.classList.add("hidden");
-      notebookInput.dispatchEvent(new Event("change"));
+      addTag(t.tag);
+      tagInput.value = "";
+      tagSuggestions.classList.add("hidden");
     });
-    notebookSuggestions.appendChild(li);
+    tagSuggestions.appendChild(li);
   });
 }
 
-function selectNotebook(nb) {
-  currentNotebook = nb;
-  renderNotebookTabs();
+function selectFilterTag(tag) {
+  currentFilterTag = tag;
+  renderTagBar();
   loadNotes();
 }
 
-document.getElementById("nb-all").addEventListener("click", () => selectNotebook(null));
-document.getElementById("nb-uncategorized").addEventListener("click", () => selectNotebook(""));
+document.getElementById("nb-all").addEventListener("click", () => selectFilterTag(null));
+document.getElementById("nb-uncategorized").addEventListener("click", () => selectFilterTag(""));
+
+// === Tag chip rendering in editor ===
+function renderCurrentTags() {
+  tagChipsEl.innerHTML = "";
+  currentNoteTags.forEach((tag) => {
+    const chip = document.createElement("span");
+    chip.className = "tag-chip";
+    chip.textContent = tag;
+    const removeBtn = document.createElement("button");
+    removeBtn.className = "tag-chip-remove";
+    removeBtn.textContent = "\u00D7";
+    removeBtn.title = "Remove tag";
+    removeBtn.addEventListener("click", () => removeTag(tag));
+    chip.appendChild(removeBtn);
+    tagChipsEl.appendChild(chip);
+  });
+}
+
+function addTag(tag) {
+  tag = tag.trim();
+  if (!tag || currentNoteTags.includes(tag)) return;
+  currentNoteTags.push(tag);
+  renderCurrentTags();
+  saveTagsToNote();
+}
+
+function removeTag(tag) {
+  currentNoteTags = currentNoteTags.filter((t) => t !== tag);
+  renderCurrentTags();
+  saveTagsToNote();
+}
+
+function saveTagsToNote() {
+  if (!currentNoteId) return;
+  dirty = true;
+  clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(() => {
+    saveNote().then(() => loadTags());
+  }, 600);
+}
 
 // === Bulk operations ===
 function enterBulkMode() {
@@ -480,24 +531,24 @@ document.getElementById("bulk-delete").addEventListener("click", async () => {
   }
   exitBulkMode();
   loadNotes();
-  loadNotebooks();
+  loadTags();
 });
 
-document.getElementById("bulk-move").addEventListener("click", async () => {
+document.getElementById("bulk-tag").addEventListener("click", async () => {
   if (!selectedIds.size) return;
-  const nbName = prompt("Move " + selectedIds.size + " note(s) to notebook (leave empty for Unfiled):", "");
-  if (nbName === null) return;
+  const tagName = prompt("Add tag to " + selectedIds.size + " note(s):", "");
+  if (tagName === null || !tagName.trim()) return;
   try {
     await api("/notes/bulk", {
       method: "POST",
-      body: JSON.stringify({ action: "move", ids: Array.from(selectedIds), notebook: nbName.trim() }),
+      body: JSON.stringify({ action: "tag", ids: Array.from(selectedIds), tag: tagName.trim() }),
     });
   } catch {
-    alert("Failed to move notes");
+    alert("Failed to tag notes");
   }
   exitBulkMode();
   loadNotes();
-  loadNotebooks();
+  loadTags();
 });
 
 // === Note list ===
@@ -506,7 +557,7 @@ async function loadNotes() {
     let path = "/notes";
     const params = [];
     if (searchQuery) params.push("q=" + encodeURIComponent(searchQuery));
-    if (currentNotebook !== null) params.push("notebook=" + encodeURIComponent(currentNotebook));
+    if (currentFilterTag !== null) params.push("tag=" + encodeURIComponent(currentFilterTag));
     if (params.length) path += "?" + params.join("&");
     const notes = await api(path);
     setCachedNotes(notes);
@@ -540,7 +591,10 @@ function renderNoteList(notes) {
       month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
     });
     const pinIcon = n.pinned ? '<span class="pin-icon" aria-label="Pinned">&#x1F4CC;</span> ' : "";
-    const nbLabel = n.notebook ? ' &middot; <span class="note-item-nb">' + escapeHtml(n.notebook) + '</span>' : "";
+    const tags = Array.isArray(n.tags) ? n.tags : [];
+    const tagsHtml = tags.length
+      ? ' &middot; <span class="note-item-tags">' + tags.map((t) => '<span class="note-item-tag">' + escapeHtml(t) + '</span>').join(", ") + '</span>'
+      : "";
 
     // Search highlight
     const titleHtml = searchQuery ? highlightText(n.title, searchQuery) : escapeHtml(n.title);
@@ -549,31 +603,33 @@ function renderNoteList(notes) {
     li.innerHTML = `
       <span class="note-item-title">${pinIcon}${titleHtml}</span>
       ${snippetHtml ? '<span class="note-item-snippet">' + snippetHtml + '</span>' : ''}
-      <span class="note-item-meta">${escapeHtml(n.language)} &middot; ${date}${nbLabel}</span>
+      <span class="note-item-meta">${escapeHtml(n.language)} &middot; ${date}${tagsHtml}</span>
     `;
 
-    // Unfile button when viewing a specific notebook
-    if (currentNotebook && n.notebook && !bulkMode) {
+    // Remove-tag button when filtering by a specific tag
+    if (currentFilterTag && tags.includes(currentFilterTag) && !bulkMode) {
       const unfile = document.createElement("button");
       unfile.className = "btn-unfile";
-      unfile.title = "Remove from notebook";
-      unfile.setAttribute("aria-label", "Remove from notebook");
+      unfile.title = "Remove tag \"" + currentFilterTag + "\"";
+      unfile.setAttribute("aria-label", "Remove tag");
       unfile.textContent = "\u00D7";
       unfile.addEventListener("click", async (e) => {
         e.stopPropagation();
+        const newTags = tags.filter((t) => t !== currentFilterTag);
         try {
           await api("/notes/" + n.id, {
             method: "PUT",
-            body: JSON.stringify({ notebook: "" }),
+            body: JSON.stringify({ tags: newTags }),
           });
         } catch {
-          enqueue({ type: "update", noteId: n.id, data: { notebook: "" } });
+          enqueue({ type: "save", noteId: n.id, data: { tags: newTags } });
         }
         if (n.id === currentNoteId) {
-          notebookInput.value = "";
+          currentNoteTags = newTags;
+          renderCurrentTags();
         }
         loadNotes();
-        loadNotebooks();
+        loadTags();
       });
       li.appendChild(unfile);
     }
@@ -644,10 +700,11 @@ async function openNote(id) {
     currentNotePinned = note.pinned || false;
     currentNoteCreatedAt = note.created_at;
     currentNoteUpdatedAt = note.updated_at;
+    currentNoteTags = Array.isArray(note.tags) ? [...note.tags] : [];
     titleInput.value = note.title;
     langSelect.value = note.language;
     contentArea.value = note.content;
-    notebookInput.value = note.notebook || "";
+    renderCurrentTags();
     showEditor();
     updatePinButton();
     updateStats();
@@ -661,10 +718,11 @@ async function openNote(id) {
       currentNotePinned = cached.pinned || false;
       currentNoteCreatedAt = cached.created_at;
       currentNoteUpdatedAt = cached.updated_at;
+      currentNoteTags = Array.isArray(cached.tags) ? [...cached.tags] : [];
       titleInput.value = cached.title;
       langSelect.value = cached.language || "plaintext";
       contentArea.value = cached.content || "";
-      notebookInput.value = cached.notebook || "";
+      renderCurrentTags();
       showEditor();
       updatePinButton();
       updateStats();
@@ -677,19 +735,20 @@ async function openNote(id) {
 
 async function createNote() {
   try {
-    const nb = currentNotebook && currentNotebook !== "" ? currentNotebook : "";
+    const tags = currentFilterTag && currentFilterTag !== "" ? [currentFilterTag] : [];
     const note = await api("/notes", {
       method: "POST",
-      body: JSON.stringify({ title: "Untitled", content: "", language: "plaintext", notebook: nb }),
+      body: JSON.stringify({ title: "Untitled", content: "", language: "plaintext", tags }),
     });
     currentNoteId = note.id;
     currentNotePinned = false;
     currentNoteCreatedAt = note.created_at;
     currentNoteUpdatedAt = note.updated_at;
+    currentNoteTags = Array.isArray(note.tags) ? [...note.tags] : [];
     titleInput.value = note.title;
     langSelect.value = note.language;
     contentArea.value = note.content;
-    notebookInput.value = note.notebook || "";
+    renderCurrentTags();
     showEditor();
     updatePinButton();
     updateStats();
@@ -697,10 +756,10 @@ async function createNote() {
     titleInput.focus();
     titleInput.select();
     await loadNotes();
-    loadNotebooks();
+    loadTags();
     closeSidebar();
   } catch {
-    const nb = currentNotebook && currentNotebook !== "" ? currentNotebook : "";
+    const tags = currentFilterTag && currentFilterTag !== "" ? [currentFilterTag] : [];
     const tempId = "temp_" + Date.now();
     const now = new Date().toISOString();
     const tempNote = {
@@ -709,11 +768,11 @@ async function createNote() {
       content: "",
       language: "plaintext",
       pinned: false,
-      notebook: nb,
+      tags,
       created_at: now,
       updated_at: now,
     };
-    enqueue({ type: "create", tempId, data: { title: "Untitled", content: "", language: "plaintext", notebook: nb } });
+    enqueue({ type: "create", tempId, data: { title: "Untitled", content: "", language: "plaintext", tags } });
     const cached = getCachedNotes();
     cached.unshift(tempNote);
     setCachedNotes(cached);
@@ -721,10 +780,11 @@ async function createNote() {
     currentNotePinned = false;
     currentNoteCreatedAt = now;
     currentNoteUpdatedAt = now;
+    currentNoteTags = [...tags];
     titleInput.value = tempNote.title;
     langSelect.value = tempNote.language;
     contentArea.value = tempNote.content;
-    notebookInput.value = nb;
+    renderCurrentTags();
     showEditor();
     updatePinButton();
     updateStats();
@@ -739,27 +799,29 @@ async function createNote() {
 
 async function createNoteFromFile(filename, content, language) {
   try {
+    const tags = currentFilterTag && currentFilterTag !== "" ? [currentFilterTag] : [];
     const note = await api("/notes", {
       method: "POST",
-      body: JSON.stringify({ title: filename, content, language, notebook: currentNotebook && currentNotebook !== "" ? currentNotebook : "" }),
+      body: JSON.stringify({ title: filename, content, language, tags }),
     });
     currentNoteId = note.id;
     currentNotePinned = false;
     currentNoteCreatedAt = note.created_at;
     currentNoteUpdatedAt = note.updated_at;
+    currentNoteTags = Array.isArray(note.tags) ? [...note.tags] : [];
     titleInput.value = note.title;
     langSelect.value = note.language;
     contentArea.value = note.content;
-    notebookInput.value = note.notebook || "";
+    renderCurrentTags();
     showEditor();
     updatePinButton();
     updateStats();
     updateTimestamps();
     if (note.content) togglePreview();
     await loadNotes();
-    loadNotebooks();
+    loadTags();
   } catch {
-    const nb = currentNotebook && currentNotebook !== "" ? currentNotebook : "";
+    const tags = currentFilterTag && currentFilterTag !== "" ? [currentFilterTag] : [];
     const tempId = "temp_" + Date.now();
     const now = new Date().toISOString();
     const tempNote = {
@@ -768,11 +830,11 @@ async function createNoteFromFile(filename, content, language) {
       content,
       language,
       pinned: false,
-      notebook: nb,
+      tags,
       created_at: now,
       updated_at: now,
     };
-    enqueue({ type: "create", tempId, data: { title: filename, content, language, notebook: nb } });
+    enqueue({ type: "create", tempId, data: { title: filename, content, language, tags } });
     const cached = getCachedNotes();
     cached.unshift(tempNote);
     setCachedNotes(cached);
@@ -780,10 +842,11 @@ async function createNoteFromFile(filename, content, language) {
     currentNotePinned = false;
     currentNoteCreatedAt = now;
     currentNoteUpdatedAt = now;
+    currentNoteTags = [...tags];
     titleInput.value = tempNote.title;
     langSelect.value = tempNote.language;
     contentArea.value = tempNote.content;
-    notebookInput.value = nb;
+    renderCurrentTags();
     showEditor();
     updatePinButton();
     updateStats();
@@ -806,7 +869,7 @@ async function saveNote() {
     title: titleInput.value || "Untitled",
     content: contentArea.value,
     language: langSelect.value,
-    notebook: notebookInput.value.trim(),
+    tags: currentNoteTags,
   };
   try {
     const note = await api("/notes/" + currentNoteId, {
@@ -1638,24 +1701,41 @@ langSelect.addEventListener("change", () => {
   scheduleSave();
   updatePreview();
 });
-notebookInput.addEventListener("change", () => {
-  dirty = true;
-  clearTimeout(saveTimeout);
-  saveTimeout = setTimeout(() => {
-    saveNote().then(() => loadNotebooks());
-  }, 600);
+
+// Tag input events
+tagInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" || e.key === ",") {
+    e.preventDefault();
+    const val = tagInput.value.replace(/,/g, "").trim();
+    if (val) {
+      addTag(val);
+      tagInput.value = "";
+      tagSuggestions.classList.add("hidden");
+    }
+  }
+  if (e.key === "Backspace" && !tagInput.value && currentNoteTags.length) {
+    removeTag(currentNoteTags[currentNoteTags.length - 1]);
+  }
 });
-notebookInput.addEventListener("input", () => {
-  updateNotebookSuggestions();
-  notebookSuggestions.classList.remove("hidden");
+tagInput.addEventListener("input", () => {
+  updateTagSuggestions();
+  tagSuggestions.classList.remove("hidden");
 });
-notebookInput.addEventListener("focus", () => {
-  updateNotebookSuggestions();
-  notebookSuggestions.classList.remove("hidden");
+tagInput.addEventListener("focus", () => {
+  updateTagSuggestions();
+  tagSuggestions.classList.remove("hidden");
 });
-notebookInput.addEventListener("blur", () => {
+tagInput.addEventListener("blur", () => {
   // Delay to allow mousedown on suggestion to fire first
-  setTimeout(() => notebookSuggestions.classList.add("hidden"), 150);
+  setTimeout(() => {
+    tagSuggestions.classList.add("hidden");
+    // Commit any pending text as a tag
+    const val = tagInput.value.trim();
+    if (val) {
+      addTag(val);
+      tagInput.value = "";
+    }
+  }, 150);
 });
 
 // === Unsaved changes warning ===
@@ -1670,7 +1750,7 @@ window.addEventListener("beforeunload", (e) => {
 setTheme(getTheme());
 setOnline(navigator.onLine);
 loadNotes();
-loadNotebooks();
+loadTags();
 flushQueue();
 setupDragDrop(dropZone);
 setupDragDrop(contentArea);

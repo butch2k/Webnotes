@@ -50,6 +50,25 @@ async function initDb() {
     END $$
   `);
 
+  // Add tags column and migrate from notebook
+  await pool.query(`
+    DO $$ BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'notes' AND column_name = 'tags'
+      ) THEN
+        ALTER TABLE notes ADD COLUMN tags TEXT[] NOT NULL DEFAULT '{}';
+        -- Migrate existing notebook values to tags
+        UPDATE notes SET tags = ARRAY[notebook] WHERE notebook != '';
+      END IF;
+    END $$
+  `);
+
+  // GIN index on tags for fast lookups
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_notes_tags ON notes USING GIN (tags)
+  `);
+
   // Full-text search: generated tsvector column + GIN index
   await pool.query(`
     DO $$ BEGIN
@@ -84,9 +103,9 @@ async function initDb() {
   `);
 }
 
-const NOTE_COLS = "id, title, content, language, pinned, notebook, created_at, updated_at";
+const NOTE_COLS = "id, title, content, language, pinned, tags, created_at, updated_at";
 
-async function listNotes(q, notebook) {
+async function listNotes(q, tag) {
   const conditions = [];
   const params = [];
   let rankSelect = "";
@@ -104,9 +123,14 @@ async function listNotes(q, notebook) {
     }
   }
 
-  if (notebook !== undefined && notebook !== null) {
-    params.push(notebook);
-    conditions.push(`notebook = $${params.length}`);
+  if (tag !== undefined && tag !== null) {
+    if (tag === "") {
+      // Untagged notes
+      conditions.push(`tags = '{}'`);
+    } else {
+      params.push(tag);
+      conditions.push(`$${params.length} = ANY(tags)`);
+    }
   }
 
   const where = conditions.length ? "WHERE " + conditions.join(" AND ") : "";
@@ -126,15 +150,16 @@ async function getNote(id) {
   return rows[0] || null;
 }
 
-async function createNote({ title, content, language, notebook }) {
+async function createNote({ title, content, language, tags }) {
+  const tagsArr = Array.isArray(tags) ? tags.filter(Boolean) : [];
   const { rows } = await pool.query(
-    `INSERT INTO notes (title, content, language, notebook) VALUES ($1, $2, $3, $4) RETURNING ${NOTE_COLS}`,
-    [title || "Untitled", content || "", language || "plaintext", notebook || ""]
+    `INSERT INTO notes (title, content, language, tags) VALUES ($1, $2, $3, $4) RETURNING ${NOTE_COLS}`,
+    [title || "Untitled", content || "", language || "plaintext", tagsArr]
   );
   return rows[0];
 }
 
-async function updateNote(id, { title, content, language, pinned, notebook }) {
+async function updateNote(id, { title, content, language, pinned, tags }) {
   // Save version before modifying if content changes
   if (content !== undefined) {
     const current = await getNote(id);
@@ -153,13 +178,15 @@ async function updateNote(id, { title, content, language, pinned, notebook }) {
     }
   }
 
+  const tagsVal = tags !== undefined ? (Array.isArray(tags) ? tags.filter(Boolean) : []) : null;
+
   const { rows } = await pool.query(
     `UPDATE notes SET
        title = COALESCE($1, title),
        content = COALESCE($2, content),
        language = COALESCE($3, language),
        pinned = COALESCE($4, pinned),
-       notebook = COALESCE($5, notebook),
+       tags = COALESCE($5, tags),
        updated_at = NOW()
      WHERE id = $6 RETURNING ${NOTE_COLS}`,
     [
@@ -167,7 +194,7 @@ async function updateNote(id, { title, content, language, pinned, notebook }) {
       content !== undefined ? content : null,
       language !== undefined ? language : null,
       pinned !== undefined ? pinned : null,
-      notebook !== undefined ? notebook : null,
+      tagsVal,
       id,
     ]
   );
@@ -184,24 +211,24 @@ async function healthCheck() {
   return { status: "ok", db: "connected" };
 }
 
-async function listNotebooks() {
+async function listTags() {
   const { rows } = await pool.query(
-    `SELECT notebook, COUNT(*)::int AS count FROM notes WHERE notebook != '' GROUP BY notebook ORDER BY notebook`
+    `SELECT unnest(tags) AS tag, COUNT(*)::int AS count FROM notes WHERE tags != '{}' GROUP BY tag ORDER BY tag`
   );
   return rows;
 }
 
-async function renameNotebook(oldName, newName) {
+async function renameTag(oldName, newName) {
   const { rowCount } = await pool.query(
-    `UPDATE notes SET notebook = $1, updated_at = NOW() WHERE notebook = $2`,
-    [newName, oldName]
+    `UPDATE notes SET tags = array_replace(tags, $1, $2), updated_at = NOW() WHERE $1 = ANY(tags)`,
+    [oldName, newName]
   );
   return rowCount;
 }
 
-async function deleteNotebook(name) {
+async function deleteTag(name) {
   const { rowCount } = await pool.query(
-    `UPDATE notes SET notebook = '', updated_at = NOW() WHERE notebook = $1`,
+    `UPDATE notes SET tags = array_remove(tags, $1), updated_at = NOW() WHERE $1 = ANY(tags)`,
     [name]
   );
   return rowCount;
@@ -217,12 +244,12 @@ async function bulkDelete(ids) {
   return rowCount;
 }
 
-async function bulkMove(ids, notebook) {
+async function bulkTag(ids, tag) {
   if (!ids.length) return 0;
   const placeholders = ids.map((_, i) => `$${i + 2}`).join(",");
   const { rowCount } = await pool.query(
-    `UPDATE notes SET notebook = $1, updated_at = NOW() WHERE id IN (${placeholders})`,
-    [notebook, ...ids.map(Number)]
+    `UPDATE notes SET tags = CASE WHEN NOT ($1 = ANY(tags)) THEN array_append(tags, $1) ELSE tags END, updated_at = NOW() WHERE id IN (${placeholders})`,
+    [tag, ...ids.map(Number)]
   );
   return rowCount;
 }
@@ -240,6 +267,6 @@ async function close() {
 }
 
 module.exports = {
-  initDb, listNotes, listNotebooks, getNote, createNote, updateNote, deleteNote,
-  healthCheck, close, renameNotebook, deleteNotebook, bulkDelete, bulkMove, getVersions,
+  initDb, listNotes, listTags, getNote, createNote, updateNote, deleteNote,
+  healthCheck, close, renameTag, deleteTag, bulkDelete, bulkTag, getVersions,
 };

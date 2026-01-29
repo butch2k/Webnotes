@@ -17,6 +17,16 @@ function load() {
       notes = Array.isArray(data.notes) ? data.notes : [];
       nextId = data.nextId || 1;
       versions = data.versions || {};
+      // Migrate: notebook string → tags array
+      let migrated = false;
+      notes.forEach((n) => {
+        if (!Array.isArray(n.tags)) {
+          n.tags = n.notebook ? [n.notebook] : [];
+          delete n.notebook;
+          migrated = true;
+        }
+      });
+      if (migrated) save();
     } catch (err) {
       console.warn("Corrupted data file, starting fresh:", err.message);
       notes = [];
@@ -40,13 +50,17 @@ async function initDb() {
   console.log(`File-based storage: ${DB_FILE} (${notes.length} notes)`);
 }
 
-async function listNotes(q, notebook) {
+async function listNotes(q, tag) {
   let result = [...notes].sort((a, b) => {
     if ((a.pinned || false) !== (b.pinned || false)) return a.pinned ? -1 : 1;
     return new Date(b.updated_at) - new Date(a.updated_at);
   });
-  if (notebook !== undefined && notebook !== null) {
-    result = result.filter((n) => (n.notebook || "") === notebook);
+  if (tag !== undefined && tag !== null) {
+    if (tag === "") {
+      result = result.filter((n) => !n.tags || !n.tags.length);
+    } else {
+      result = result.filter((n) => Array.isArray(n.tags) && n.tags.includes(tag));
+    }
   }
   if (q) {
     const terms = q.toLowerCase().split(/\s+/).filter(Boolean);
@@ -62,7 +76,7 @@ async function getNote(id) {
   return notes.find((n) => n.id === Number(id)) || null;
 }
 
-async function createNote({ title, content, language, notebook }) {
+async function createNote({ title, content, language, tags }) {
   const now = new Date().toISOString();
   const note = {
     id: nextId++,
@@ -70,7 +84,7 @@ async function createNote({ title, content, language, notebook }) {
     content: content || "",
     language: language || "plaintext",
     pinned: false,
-    notebook: notebook || "",
+    tags: Array.isArray(tags) ? tags.filter(Boolean) : [],
     created_at: now,
     updated_at: now,
   };
@@ -93,7 +107,7 @@ function pushVersion(id, note) {
   }
 }
 
-async function updateNote(id, { title, content, language, pinned, notebook }) {
+async function updateNote(id, { title, content, language, pinned, tags }) {
   const note = notes.find((n) => n.id === Number(id));
   if (!note) return null;
   // Save version before modifying if content changes
@@ -104,7 +118,7 @@ async function updateNote(id, { title, content, language, pinned, notebook }) {
   if (content !== undefined) note.content = content;
   if (language !== undefined) note.language = language;
   if (pinned !== undefined) note.pinned = pinned;
-  if (notebook !== undefined) note.notebook = notebook;
+  if (tags !== undefined) note.tags = Array.isArray(tags) ? tags.filter(Boolean) : [];
   note.updated_at = new Date().toISOString();
   save();
   return note;
@@ -119,24 +133,24 @@ async function deleteNote(id) {
   return true;
 }
 
-async function listNotebooks() {
+async function listTags() {
   const counts = {};
   notes.forEach((n) => {
-    const nb = n.notebook || "";
-    if (nb) {
-      counts[nb] = (counts[nb] || 0) + 1;
-    }
+    (n.tags || []).forEach((t) => {
+      if (t) counts[t] = (counts[t] || 0) + 1;
+    });
   });
   return Object.entries(counts)
-    .map(([notebook, count]) => ({ notebook, count }))
-    .sort((a, b) => a.notebook.localeCompare(b.notebook));
+    .map(([tag, count]) => ({ tag, count }))
+    .sort((a, b) => a.tag.localeCompare(b.tag));
 }
 
-async function renameNotebook(oldName, newName) {
+async function renameTag(oldName, newName) {
   let count = 0;
   notes.forEach((n) => {
-    if (n.notebook === oldName) {
-      n.notebook = newName;
+    const idx = (n.tags || []).indexOf(oldName);
+    if (idx !== -1) {
+      n.tags[idx] = newName;
       count++;
     }
   });
@@ -144,11 +158,12 @@ async function renameNotebook(oldName, newName) {
   return count;
 }
 
-async function deleteNotebook(name) {
+async function deleteTag(name) {
   let count = 0;
   notes.forEach((n) => {
-    if (n.notebook === name) {
-      n.notebook = "";
+    const idx = (n.tags || []).indexOf(name);
+    if (idx !== -1) {
+      n.tags.splice(idx, 1);
       count++;
     }
   });
@@ -165,12 +180,15 @@ async function bulkDelete(ids) {
   return before - notes.length;
 }
 
-async function bulkMove(ids, notebook) {
+async function bulkTag(ids, tag) {
   const idSet = new Set(ids.map(Number));
   let count = 0;
   notes.forEach((n) => {
     if (idSet.has(n.id)) {
-      n.notebook = notebook;
+      if (!n.tags) n.tags = [];
+      if (!n.tags.includes(tag)) {
+        n.tags.push(tag);
+      }
       count++;
     }
   });
@@ -187,6 +205,6 @@ async function healthCheck() {
 }
 
 module.exports = {
-  initDb, listNotes, listNotebooks, getNote, createNote, updateNote, deleteNote,
-  healthCheck, renameNotebook, deleteNotebook, bulkDelete, bulkMove, getVersions,
+  initDb, listNotes, listTags, getNote, createNote, updateNote, deleteNote,
+  healthCheck, renameTag, deleteTag, bulkDelete, bulkTag, getVersions,
 };
