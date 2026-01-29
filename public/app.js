@@ -9,19 +9,25 @@ const btnNew = document.getElementById("btn-new");
 const btnPreview = document.getElementById("btn-preview");
 const btnCopy = document.getElementById("btn-copy");
 const btnDelete = document.getElementById("btn-delete");
+const btnPin = document.getElementById("btn-pin");
 const btnTheme = document.getElementById("btn-theme");
 const themeIcon = document.getElementById("theme-icon");
 const saveIndicator = document.querySelector(".save-indicator");
 const offlineBanner = document.getElementById("offline-banner");
 const searchInput = document.getElementById("search-input");
+const sortSelect = document.getElementById("sort-select");
+const statusStats = document.getElementById("status-stats");
+const dropZone = document.getElementById("drop-zone");
 
 let currentNoteId = null;
+let currentNotePinned = false;
 let saveTimeout = null;
 let searchTimeout = null;
 let previewing = false;
 let online = navigator.onLine;
 let searchQuery = "";
 let lastNotes = [];
+let sortOrder = localStorage.getItem("webnotes_sort") || "updated";
 
 // === Theme ===
 const THEME_KEY = "webnotes_theme";
@@ -34,7 +40,6 @@ function setTheme(theme) {
   document.documentElement.setAttribute("data-theme", theme);
   localStorage.setItem(THEME_KEY, theme);
 
-  // Toggle highlight.js stylesheets
   const darkSheet = document.getElementById("hljs-dark");
   const lightSheet = document.getElementById("hljs-light");
   if (theme === "light") {
@@ -48,7 +53,6 @@ function setTheme(theme) {
   themeIcon.textContent = theme === "dark" ? "\u2600" : "\u263E";
   btnTheme.setAttribute("aria-label", theme === "dark" ? "Switch to light theme" : "Switch to dark theme");
 
-  // Re-render preview if open
   if (previewing) updatePreview();
 }
 
@@ -172,7 +176,6 @@ async function api(path, opts = {}) {
 }
 
 // === Search ===
-// Client-side filter for offline / instant fallback
 function filterNotesLocal(notes) {
   if (!searchQuery) return notes;
   const q = searchQuery.toLowerCase();
@@ -186,9 +189,7 @@ function filterNotesLocal(notes) {
 
 searchInput.addEventListener("input", () => {
   searchQuery = searchInput.value.trim();
-  // Immediate client-side filter for responsiveness
   renderNoteList(lastNotes);
-  // Debounced server-side search when online
   clearTimeout(searchTimeout);
   if (online && searchQuery) {
     searchTimeout = setTimeout(serverSearch, 300);
@@ -199,15 +200,43 @@ async function serverSearch() {
   if (!searchQuery) return;
   try {
     const notes = await api("/notes?q=" + encodeURIComponent(searchQuery));
-    // Only apply if the search query hasn't changed while waiting
     if (searchQuery === searchInput.value.trim()) {
       lastNotes = notes;
       renderNoteList(notes);
     }
   } catch {
-    // Fall back to local filter (already rendered)
+    // Fall back to local filter
   }
 }
+
+// === Sort ===
+function sortNotes(notes) {
+  const sorted = [...notes];
+  // Pinned always first
+  sorted.sort((a, b) => {
+    const ap = a.pinned ? 1 : 0;
+    const bp = b.pinned ? 1 : 0;
+    if (ap !== bp) return bp - ap;
+    switch (sortOrder) {
+      case "created":
+        return new Date(b.created_at) - new Date(a.created_at);
+      case "title":
+        return (a.title || "").localeCompare(b.title || "");
+      case "title-desc":
+        return (b.title || "").localeCompare(a.title || "");
+      default: // "updated"
+        return new Date(b.updated_at) - new Date(a.updated_at);
+    }
+  });
+  return sorted;
+}
+
+sortSelect.value = sortOrder;
+sortSelect.addEventListener("change", () => {
+  sortOrder = sortSelect.value;
+  localStorage.setItem("webnotes_sort", sortOrder);
+  renderNoteList(lastNotes);
+});
 
 // === Note list ===
 async function loadNotes() {
@@ -226,10 +255,10 @@ async function loadNotes() {
 }
 
 function renderNoteList(notes) {
-  // Apply client-side filter (also covers offline and non-search case)
   const filtered = searchQuery && online ? notes : filterNotesLocal(notes);
+  const sorted = sortNotes(filtered);
   noteList.innerHTML = "";
-  if (!filtered.length) {
+  if (!sorted.length) {
     const p = document.createElement("li");
     p.className = "note-list-empty";
     p.setAttribute("role", "presentation");
@@ -237,7 +266,7 @@ function renderNoteList(notes) {
     noteList.appendChild(p);
     return;
   }
-  filtered.forEach((n) => {
+  sorted.forEach((n) => {
     const li = document.createElement("li");
     li.setAttribute("role", "option");
     li.setAttribute("tabindex", "0");
@@ -246,8 +275,9 @@ function renderNoteList(notes) {
     const date = new Date(n.updated_at).toLocaleDateString(undefined, {
       month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
     });
+    const pinIcon = n.pinned ? '<span class="pin-icon" aria-label="Pinned">&#x1F4CC;</span> ' : "";
     li.innerHTML = `
-      <span class="note-item-title">${escapeHtml(n.title)}</span>
+      <span class="note-item-title">${pinIcon}${escapeHtml(n.title)}</span>
       <span class="note-item-meta">${escapeHtml(n.language)} &middot; ${date}</span>
     `;
     li.onclick = () => openNote(n.id);
@@ -266,20 +296,26 @@ async function openNote(id) {
   try {
     const note = await api("/notes/" + id);
     currentNoteId = note.id;
+    currentNotePinned = note.pinned || false;
     titleInput.value = note.title;
     langSelect.value = note.language;
     contentArea.value = note.content;
     showEditor();
+    updatePinButton();
+    updateStats();
     if (note.content) togglePreview();
     loadNotes();
   } catch {
     const cached = getCachedNotes().find((n) => n.id === id);
     if (cached) {
       currentNoteId = cached.id;
+      currentNotePinned = cached.pinned || false;
       titleInput.value = cached.title;
       langSelect.value = cached.language || "plaintext";
       contentArea.value = cached.content || "";
       showEditor();
+      updatePinButton();
+      updateStats();
       if (cached.content) togglePreview();
       renderNoteList(getCachedNotes());
     }
@@ -293,10 +329,13 @@ async function createNote() {
       body: JSON.stringify({ title: "Untitled", content: "", language: "plaintext" }),
     });
     currentNoteId = note.id;
+    currentNotePinned = false;
     titleInput.value = note.title;
     langSelect.value = note.language;
     contentArea.value = note.content;
     showEditor();
+    updatePinButton();
+    updateStats();
     titleInput.focus();
     titleInput.select();
     await loadNotes();
@@ -307,6 +346,7 @@ async function createNote() {
       title: "Untitled",
       content: "",
       language: "plaintext",
+      pinned: false,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -315,12 +355,60 @@ async function createNote() {
     cached.unshift(tempNote);
     setCachedNotes(cached);
     currentNoteId = tempId;
+    currentNotePinned = false;
     titleInput.value = tempNote.title;
     langSelect.value = tempNote.language;
     contentArea.value = tempNote.content;
     showEditor();
+    updatePinButton();
+    updateStats();
     titleInput.focus();
     titleInput.select();
+    lastNotes = getCachedNotes();
+    renderNoteList(lastNotes);
+  }
+}
+
+async function createNoteFromFile(filename, content, language) {
+  try {
+    const note = await api("/notes", {
+      method: "POST",
+      body: JSON.stringify({ title: filename, content, language }),
+    });
+    currentNoteId = note.id;
+    currentNotePinned = false;
+    titleInput.value = note.title;
+    langSelect.value = note.language;
+    contentArea.value = note.content;
+    showEditor();
+    updatePinButton();
+    updateStats();
+    if (note.content) togglePreview();
+    await loadNotes();
+  } catch {
+    const tempId = "temp_" + Date.now();
+    const tempNote = {
+      id: tempId,
+      title: filename,
+      content,
+      language,
+      pinned: false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    enqueue({ type: "create", tempId, data: { title: filename, content, language } });
+    const cached = getCachedNotes();
+    cached.unshift(tempNote);
+    setCachedNotes(cached);
+    currentNoteId = tempId;
+    currentNotePinned = false;
+    titleInput.value = tempNote.title;
+    langSelect.value = tempNote.language;
+    contentArea.value = tempNote.content;
+    showEditor();
+    updatePinButton();
+    updateStats();
+    if (content) togglePreview();
     lastNotes = getCachedNotes();
     renderNoteList(lastNotes);
   }
@@ -359,6 +447,35 @@ async function saveNote() {
   }
 }
 
+async function togglePin() {
+  if (!currentNoteId) return;
+  currentNotePinned = !currentNotePinned;
+  updatePinButton();
+  try {
+    await api("/notes/" + currentNoteId, {
+      method: "PUT",
+      body: JSON.stringify({ pinned: currentNotePinned }),
+    });
+    loadNotes();
+  } catch {
+    enqueue({ type: "save", noteId: currentNoteId, data: { pinned: currentNotePinned } });
+    const cached = getCachedNotes();
+    const idx = cached.findIndex((n) => n.id === currentNoteId);
+    if (idx !== -1) {
+      cached[idx].pinned = currentNotePinned;
+      setCachedNotes(cached);
+    }
+    lastNotes = getCachedNotes();
+    renderNoteList(lastNotes);
+  }
+}
+
+function updatePinButton() {
+  btnPin.classList.toggle("active", currentNotePinned);
+  btnPin.setAttribute("aria-pressed", String(currentNotePinned));
+  btnPin.title = currentNotePinned ? "Unpin note" : "Pin note";
+}
+
 async function deleteNote() {
   if (!currentNoteId) return;
   if (!confirm("Delete this note?")) return;
@@ -385,6 +502,15 @@ async function copyToClipboard() {
     document.execCommand("copy");
     flashSaved("Copied!");
   }
+}
+
+// === Word / char / line count ===
+function updateStats() {
+  const text = contentArea.value;
+  const chars = text.length;
+  const lines = text ? text.split("\n").length : 0;
+  const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+  statusStats.textContent = `${lines} lines \u00B7 ${words} words \u00B7 ${chars} chars`;
 }
 
 // === Preview with line numbers ===
@@ -426,6 +552,69 @@ function addLineNumbers(codeEl) {
   codeEl.innerHTML = lines
     .map((line) => `<span class="line">${line || " "}</span>`)
     .join("");
+}
+
+// === Drag & drop file import ===
+const EXT_TO_LANG = {
+  js: "javascript", mjs: "javascript", cjs: "javascript",
+  ts: "typescript", tsx: "typescript",
+  py: "python", pyw: "python",
+  java: "java", kt: "java",
+  c: "c", h: "c",
+  cpp: "cpp", cc: "cpp", cxx: "cpp", hpp: "cpp",
+  cs: "csharp",
+  go: "go",
+  rs: "rust",
+  rb: "ruby",
+  php: "php",
+  sql: "sql",
+  sh: "bash", bash: "bash", zsh: "bash",
+  html: "html", htm: "html",
+  css: "css", scss: "css", less: "css",
+  json: "json",
+  yaml: "yaml", yml: "yaml",
+  xml: "xml", svg: "xml",
+  md: "markdown", markdown: "markdown",
+  ini: "ini", conf: "ini", cfg: "ini", toml: "ini",
+  dockerfile: "dockerfile",
+  properties: "properties",
+};
+
+function detectLanguage(filename) {
+  const name = filename.toLowerCase();
+  if (name === "dockerfile" || name.startsWith("dockerfile.")) return "dockerfile";
+  if (name === "nginx.conf" || name.endsWith(".nginx")) return "nginx";
+  const ext = name.split(".").pop();
+  return EXT_TO_LANG[ext] || "plaintext";
+}
+
+function handleFileDrop(file) {
+  if (!file.type.startsWith("text/") && file.size > 5 * 1024 * 1024) {
+    alert("File too large (max 5 MB)");
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = () => {
+    const lang = detectLanguage(file.name);
+    createNoteFromFile(file.name, reader.result, lang);
+  };
+  reader.readAsText(file);
+}
+
+function setupDragDrop(el) {
+  el.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    el.classList.add("drag-over");
+  });
+  el.addEventListener("dragleave", () => {
+    el.classList.remove("drag-over");
+  });
+  el.addEventListener("drop", (e) => {
+    e.preventDefault();
+    el.classList.remove("drag-over");
+    const file = e.dataTransfer.files[0];
+    if (file) handleFileDrop(file);
+  });
 }
 
 // === UI helpers ===
@@ -470,7 +659,6 @@ contentArea.addEventListener("keydown", (e) => {
 });
 
 // === Keyboard shortcuts ===
-// Use Alt+key to avoid conflicts with browser shortcuts (Ctrl+N, Ctrl+P, etc.)
 document.addEventListener("keydown", (e) => {
   if (e.altKey && e.key === "n") {
     e.preventDefault();
@@ -527,9 +715,13 @@ btnNew.addEventListener("click", createNote);
 btnDelete.addEventListener("click", deleteNote);
 btnPreview.addEventListener("click", togglePreview);
 btnCopy.addEventListener("click", copyToClipboard);
+btnPin.addEventListener("click", togglePin);
 btnTheme.addEventListener("click", toggleTheme);
 titleInput.addEventListener("input", scheduleSave);
-contentArea.addEventListener("input", scheduleSave);
+contentArea.addEventListener("input", () => {
+  scheduleSave();
+  updateStats();
+});
 langSelect.addEventListener("change", () => {
   scheduleSave();
   updatePreview();
@@ -540,3 +732,5 @@ setTheme(getTheme());
 setOnline(navigator.onLine);
 loadNotes();
 flushQueue();
+setupDragDrop(dropZone);
+setupDragDrop(contentArea);

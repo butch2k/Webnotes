@@ -37,9 +37,10 @@ async function initDb() {
 }
 
 async function listNotes(q) {
-  let result = [...notes].sort(
-    (a, b) => new Date(b.updated_at) - new Date(a.updated_at)
-  );
+  let result = [...notes].sort((a, b) => {
+    if ((a.pinned || false) !== (b.pinned || false)) return a.pinned ? -1 : 1;
+    return new Date(b.updated_at) - new Date(a.updated_at);
+  });
   if (q) {
     const terms = q.toLowerCase().split(/\s+/).filter(Boolean);
     result = result.filter((n) => {
@@ -61,6 +62,7 @@ async function createNote({ title, content, language }) {
     title: title || "Untitled",
     content: content || "",
     language: language || "plaintext",
+    pinned: false,
     created_at: now,
     updated_at: now,
   };
@@ -69,12 +71,13 @@ async function createNote({ title, content, language }) {
   return note;
 }
 
-async function updateNote(id, { title, content, language }) {
+async function updateNote(id, { title, content, language, pinned }) {
   const note = notes.find((n) => n.id === Number(id));
   if (!note) return null;
   if (title !== undefined) note.title = title;
   if (content !== undefined) note.content = content;
   if (language !== undefined) note.language = language;
+  if (pinned !== undefined) note.pinned = pinned;
   note.updated_at = new Date().toISOString();
   save();
   return note;

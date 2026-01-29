@@ -33,6 +33,9 @@ function validateNote(req, res, next) {
     return res.status(400).json({ error: "title too long (max 255)" });
   if (language && language.length > 50)
     return res.status(400).json({ error: "language too long (max 50)" });
+  const { pinned } = req.body;
+  if (pinned !== undefined && typeof pinned !== "boolean")
+    return res.status(400).json({ error: "pinned must be a boolean" });
   next();
 }
 

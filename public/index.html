@@ -41,9 +41,16 @@
           <button id="btn-new" title="New note (Alt+N)">+ New</button>
         </div>
       </div>
-      <div class="sidebar-search">
+      <div class="sidebar-controls">
         <label for="search-input" class="sr-only">Search notes</label>
         <input id="search-input" type="search" placeholder="Search notes…" autocomplete="off">
+        <label for="sort-select" class="sr-only">Sort notes</label>
+        <select id="sort-select" title="Sort notes">
+          <option value="updated">Recently updated</option>
+          <option value="created">Recently created</option>
+          <option value="title">Title A–Z</option>
+          <option value="title-desc">Title Z–A</option>
+        </select>
       </div>
       <ul id="note-list" role="listbox" aria-label="Notes"></ul>
     </aside>
@@ -51,7 +58,9 @@
     <!-- Editor -->
     <main class="editor" aria-label="Note editor">
       <div id="empty-state" class="empty-state">
-        <p>Select a note or create a new one</p>
+        <div id="drop-zone" class="drop-zone">
+          <p>Select a note, create a new one, or drop a file here</p>
+        </div>
       </div>
       <div id="editor-area" class="hidden">
         <div class="toolbar" role="toolbar" aria-label="Note toolbar">
@@ -85,6 +94,7 @@
             <option value="dockerfile">Dockerfile</option>
             <option value="markdown">Markdown</option>
           </select>
+          <button id="btn-pin" class="toolbar-btn" title="Pin/unpin note" aria-pressed="false">Pin</button>
           <button id="btn-preview" class="toolbar-btn" title="Toggle syntax preview (Alt+P)" aria-pressed="false">Preview</button>
           <button id="btn-copy" class="toolbar-btn" title="Copy to clipboard (Alt+C)">Copy</button>
           <button id="btn-delete" title="Delete note">Delete</button>
@@ -93,6 +103,9 @@
         <label for="note-content" class="sr-only">Note content</label>
         <textarea id="note-content" placeholder="Paste or type your text here…" spellcheck="false"></textarea>
         <pre id="note-preview" class="hidden" aria-label="Syntax highlighted preview"><code></code></pre>
+        <div class="status-bar" aria-live="polite">
+          <span id="status-stats"></span>
+        </div>
       </div>
     </main>
   </div>

@@ -15,11 +15,25 @@ async function initDb() {
       title VARCHAR(255) NOT NULL DEFAULT 'Untitled',
       content TEXT NOT NULL DEFAULT '',
       language VARCHAR(50) NOT NULL DEFAULT 'plaintext',
+      pinned BOOLEAN NOT NULL DEFAULT FALSE,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
 
+  // Add pinned column if missing (migration for existing DBs)
+  await pool.query(`
+    DO $$ BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'notes' AND column_name = 'pinned'
+      ) THEN
+        ALTER TABLE notes ADD COLUMN pinned BOOLEAN NOT NULL DEFAULT FALSE;
+      END IF;
+    END $$
+  `);
+
+  // Full-text search: generated tsvector column + GIN index
   await pool.query(`
     DO $$ BEGIN
       IF NOT EXISTS (
@@ -37,6 +51,8 @@ async function initDb() {
   `);
 }
 
+const NOTE_COLS = "id, title, content, language, pinned, created_at, updated_at";
+
 async function listNotes(q) {
   if (q) {
     const tokens = q
@@ -46,44 +62,51 @@ async function listNotes(q) {
     if (tokens.length) {
       const tsquery = tokens.map((t) => t + ":*").join(" & ");
       const { rows } = await pool.query(
-        `SELECT id, title, content, language, created_at, updated_at,
+        `SELECT ${NOTE_COLS},
                 ts_rank(search_vector, to_tsquery('english', $1)) AS rank
          FROM notes
          WHERE search_vector @@ to_tsquery('english', $1)
-         ORDER BY rank DESC, updated_at DESC`,
+         ORDER BY pinned DESC, rank DESC, updated_at DESC`,
         [tsquery]
       );
       return rows;
     }
   }
   const { rows } = await pool.query(
-    "SELECT id, title, content, language, created_at, updated_at FROM notes ORDER BY updated_at DESC"
+    `SELECT ${NOTE_COLS} FROM notes ORDER BY pinned DESC, updated_at DESC`
   );
   return rows;
 }
 
 async function getNote(id) {
-  const { rows } = await pool.query("SELECT * FROM notes WHERE id = $1", [id]);
+  const { rows } = await pool.query(`SELECT ${NOTE_COLS} FROM notes WHERE id = $1`, [id]);
   return rows[0] || null;
 }
 
 async function createNote({ title, content, language }) {
   const { rows } = await pool.query(
-    "INSERT INTO notes (title, content, language) VALUES ($1, $2, $3) RETURNING *",
+    `INSERT INTO notes (title, content, language) VALUES ($1, $2, $3) RETURNING ${NOTE_COLS}`,
     [title || "Untitled", content || "", language || "plaintext"]
   );
   return rows[0];
 }
 
-async function updateNote(id, { title, content, language }) {
+async function updateNote(id, { title, content, language, pinned }) {
   const { rows } = await pool.query(
     `UPDATE notes SET
        title = COALESCE($1, title),
        content = COALESCE($2, content),
        language = COALESCE($3, language),
+       pinned = COALESCE($4, pinned),
        updated_at = NOW()
-     WHERE id = $4 RETURNING *`,
-    [title !== undefined ? title : null, content !== undefined ? content : null, language !== undefined ? language : null, id]
+     WHERE id = $5 RETURNING ${NOTE_COLS}`,
+    [
+      title !== undefined ? title : null,
+      content !== undefined ? content : null,
+      language !== undefined ? language : null,
+      pinned !== undefined ? pinned : null,
+      id,
+    ]
   );
   return rows[0] || null;
 }
