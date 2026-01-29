@@ -1,19 +1,43 @@
 # Webnotes
 
-Simple no-login note-taking web app with syntax highlighting. Paste text, pick a language, get colored output.
+Simple no-login note-taking web app with syntax highlighting, tags, version history, and offline support. Built with Express.js and vanilla JavaScript.
 
 ## Features
 
-- Create, edit and delete notes with auto-save
-- Syntax highlighting for 20+ languages (JavaScript, Python, YAML, SQL, Bash, Conf/INI, Nginx, Dockerfile, etc.)
-- Auto-detect language option
-- Preview mode with line numbers
-- Full-text search (PostgreSQL-backed with ranked results)
-- Light / dark theme (Catppuccin Mocha & Latte palettes, persisted in localStorage)
-- Copy to clipboard
-- Keyboard shortcuts: Alt+N (new), Alt+S (save), Alt+P (preview), Alt+C (copy), Alt+F (search), Escape (close/clear)
-- Offline resilience with localStorage queue that syncs when reconnected
-- Health check endpoint at `GET /health`
+### Editor
+- **CodeMirror 6 editor** with language-aware syntax highlighting for 30+ languages
+- **Markdown preview** with fenced code block highlighting, inline formatting, and image/link support
+- **Auto-save** with 600ms debounce — never lose your work
+- **Version history** — browse and restore up to 20 previous versions per note
+- **Export** notes as files with correct extensions (Alt+D)
+- **Copy to clipboard** (Alt+C)
+
+### Organization
+- **Tags** — assign multiple tags per note, filter by tag, rename or delete tags in bulk
+- **Pinned notes** — keep important notes at the top of the list
+- **Sort** by recently updated, recently created, or title (A–Z / Z–A)
+- **Full-text search** with result highlighting (PostgreSQL-backed ranked results, or local substring matching)
+- **Bulk operations** — multi-select notes for batch delete or tagging (long-press on mobile)
+
+### Interface
+- **Light / dark theme** — Catppuccin Mocha & Latte palettes, persisted in localStorage
+- **Resizable sidebar** with drag handle (width persisted)
+- **Responsive mobile layout** with slide-out sidebar
+- **Drag & drop file import** — drop text files onto the editor or empty state
+- **PWA** — installable with service worker caching (stale-while-revalidate)
+- **Offline resilience** — changes queue in localStorage and sync when reconnected
+
+### Accessibility
+- Skip-to-editor link, ARIA labels on all interactive elements
+- Keyboard navigation for tag menus, suggestions, and version history panel
+- Focus trapping in dialogs, `aria-live` regions for dynamic content
+- Full keyboard shortcuts: Alt+N (new), Alt+S (save), Alt+P (preview), Alt+C (copy), Alt+F (search), Alt+D (export), Escape (close/clear)
+
+### Security
+- Helmet.js with CSP, referrer policy, and frame denial
+- XSS sanitization on markdown preview output
+- Rate limiting on API and bulk endpoints
+- Input validation with size limits (title 255 chars, content 1MB, tags max 20)
 
 ## Quick start with Docker Compose
 
@@ -89,7 +113,9 @@ If none of `PGHOST`, `PGDATABASE`, or `PGUSER` are set, the app uses file-based 
 - Notes are stored in plain text (no encryption at rest)
 - Use HTTPS in production via a reverse proxy (e.g. nginx, Caddy)
 - Change default PostgreSQL credentials for production deployments
-- API endpoints are rate-limited to prevent abuse
+- API endpoints are rate-limited (300 req/15min general, 10 req/min bulk)
+- Bulk operations capped at 100 IDs per request
+- Markdown preview sanitizes rendered HTML to block XSS (strips `on*` attributes, `javascript:`/`data:` URIs, script tags)
 
 ## Browser support
 
@@ -97,6 +123,18 @@ If none of `PGHOST`, `PGDATABASE`, or `PGUSER` are set, the app uses file-based 
 - Firefox 87+
 - Safari 14+
 - Service Worker required for offline mode
+
+## Keyboard shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| Alt+N | New note |
+| Alt+S | Save |
+| Alt+P | Toggle markdown preview |
+| Alt+C | Copy to clipboard |
+| Alt+D | Export/download note |
+| Alt+F / Ctrl+F | Focus search / in-editor find |
+| Escape | Close panel, exit bulk mode, or deselect note |
 
 ## Limitations
 
