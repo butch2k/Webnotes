@@ -1,12 +1,3 @@
-// Prevent hljs "already highlighted" warnings by patching highlightElement
-if (typeof hljs !== "undefined") {
-  const origHighlightElement = hljs.highlightElement.bind(hljs);
-  hljs.highlightElement = function(el) {
-    delete el.dataset.highlighted;
-    origHighlightElement(el);
-  };
-}
-
 const noteList = document.getElementById("note-list");
 const editorArea = document.getElementById("editor-area");
 const emptyState = document.getElementById("empty-state");
