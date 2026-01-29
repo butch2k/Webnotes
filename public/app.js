@@ -404,12 +404,14 @@ function updatePreview() {
   previewEl.classList.remove("line-numbers");
 
   const lang = langSelect.value;
-  if (lang === "auto") {
-    const result = hljs.highlightAuto(contentArea.value);
-    code.innerHTML = result.value;
-  } else if (lang !== "plaintext") {
-    code.classList.add("language-" + lang);
-    hljs.highlightElement(code);
+  if (typeof hljs !== "undefined") {
+    if (lang === "auto") {
+      const result = hljs.highlightAuto(contentArea.value);
+      code.innerHTML = result.value;
+    } else if (lang !== "plaintext") {
+      code.classList.add("language-" + lang);
+      hljs.highlightElement(code);
+    }
   }
 
   addLineNumbers(code);
