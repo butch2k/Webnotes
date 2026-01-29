@@ -811,10 +811,6 @@ function togglePreview() {
 function updatePreview() {
   if (!previewing) return;
 
-  // Always clear hljs state so re-highlighting works without warnings
-  const codeEl = previewEl.querySelector("code");
-  if (codeEl) delete codeEl.dataset.highlighted;
-
   if (isMarkdownMode()) {
     previewEl.classList.add("hidden");
     mdPreviewEl.classList.remove("hidden");
@@ -837,7 +833,10 @@ function updatePreview() {
       code.innerHTML = result.value;
     } else if (lang !== "plaintext") {
       code.classList.add("language-" + lang);
-      hljs.highlightElement(code);
+      try {
+        const result = hljs.highlight(contentArea.value, { language: lang });
+        code.innerHTML = result.value;
+      } catch { /* unknown language — leave as plaintext */ }
     }
   }
 
