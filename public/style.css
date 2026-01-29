@@ -515,6 +515,13 @@ body:has(.offline-banner:not(.hidden)) .layout {
   background: var(--bg-secondary);
   flex-wrap: wrap;
 }
+.tag-bar {
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-secondary);
+}
 
 #note-title {
   flex: 1;

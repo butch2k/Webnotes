@@ -122,12 +122,6 @@
             <option value="xml">XML</option>
             <option value="yaml">YAML</option>
           </select>
-          <div class="tags-wrapper">
-            <div id="note-tags" class="tag-chips" aria-label="Tags"></div>
-            <label for="tag-input" class="sr-only">Add tag</label>
-            <input id="tag-input" type="text" placeholder="Add tag…" title="Add tag" aria-label="Add tag" autocomplete="off">
-            <ul id="tag-suggestions" class="nb-suggestions hidden" role="listbox"></ul>
-          </div>
           <button id="btn-pin" class="toolbar-btn" title="Pin/unpin note" aria-pressed="false">Pin</button>
           <button id="btn-preview" class="toolbar-btn" title="Toggle syntax preview (Alt+P)" aria-pressed="false">Preview</button>
           <button id="btn-history" class="toolbar-btn" title="Version history" aria-label="Version history">History</button>
@@ -135,6 +129,14 @@
           <button id="btn-export" class="toolbar-btn" title="Download note as file (Alt+D)" aria-label="Download note as file">Export</button>
           <button id="btn-delete" title="Delete note" aria-label="Delete note">Delete</button>
           <span class="save-indicator" role="status" aria-live="assertive" aria-atomic="true"></span>
+        </div>
+        <div class="tag-bar" role="toolbar" aria-label="Note tags">
+          <div class="tags-wrapper">
+            <div id="note-tags" class="tag-chips" aria-label="Tags"></div>
+            <label for="tag-input" class="sr-only">Add tag</label>
+            <input id="tag-input" type="text" placeholder="Add tag…" title="Add tag" aria-label="Add tag" autocomplete="off">
+            <ul id="tag-suggestions" class="nb-suggestions hidden" role="listbox"></ul>
+          </div>
         </div>
         <div id="find-bar" class="find-bar hidden">
           <label for="find-input" class="sr-only">Find in note</label>
