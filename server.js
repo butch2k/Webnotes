@@ -12,7 +12,6 @@ app.use(
       directives: {
         defaultSrc: ["'self'"],
         scriptSrc: ["'self'", "https://cdnjs.cloudflare.com", "'sha256-rK+Mx+8ZfQh6wMaytxOiKWAGb/f1Z9xO2jXMaczp21Q='", "'sha256-Nny8H/je5llKyTsleHxYL8feCRalb8GOIQ20BMZf8DE='"],
-        connectSrc: ["'self'", "https://cdnjs.cloudflare.com"],
         workerSrc: ["'self'"],
         imgSrc: ["'self'", "https:", "data:"],
         styleSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],

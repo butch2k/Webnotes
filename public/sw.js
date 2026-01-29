@@ -1,4 +1,4 @@
-const CACHE_NAME = "webnotes-v3";
+const CACHE_NAME = "webnotes-v4";
 const STATIC_ASSETS = [
   "/",
   "/index.html",
@@ -14,8 +14,6 @@ const CDN_ASSETS = [
   "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css",
   "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css",
 ];
-
-const ALLOWED_CACHE_ORIGINS = [self.location.origin, "https://cdnjs.cloudflare.com"];
 
 // Install: cache static assets
 self.addEventListener("install", (e) => {
@@ -50,9 +48,12 @@ self.addEventListener("activate", (e) => {
   self.clients.claim();
 });
 
-// Fetch: network-first for API, stale-while-revalidate for static assets
+// Fetch: network-first for API, stale-while-revalidate for same-origin static assets
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
+
+  // Only handle same-origin requests — let the browser handle CDN loads natively
+  if (url.origin !== self.location.origin) return;
 
   // API requests: network-only, no caching
   if (url.pathname.startsWith("/api/") || url.pathname === "/health") {
@@ -71,13 +72,9 @@ self.addEventListener("fetch", (e) => {
   e.respondWith(
     caches.match(e.request).then((cached) => {
       const fetchPromise = fetch(e.request).then((response) => {
-        // Only cache same-origin and known CDN responses
         if (response.ok && e.request.method === "GET") {
-          const responseOrigin = new URL(response.url).origin;
-          if (ALLOWED_CACHE_ORIGINS.includes(responseOrigin)) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(e.request, clone));
-          }
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(e.request, clone));
         }
         return response;
       }).catch(() =>
