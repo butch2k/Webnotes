@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Webnotes</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <h1>Webnotes</h1>
+        <button id="btn-new" title="New note">+ New</button>
+      </div>
+      <ul id="note-list"></ul>
+    </aside>
+
+    <!-- Editor -->
+    <main class="editor">
+      <div id="empty-state" class="empty-state">
+        <p>Select a note or create a new one</p>
+      </div>
+      <div id="editor-area" class="hidden">
+        <div class="toolbar">
+          <input id="note-title" type="text" placeholder="Title…">
+          <select id="note-lang">
+            <option value="plaintext">Plain text</option>
+            <option value="javascript">JavaScript</option>
+            <option value="typescript">TypeScript</option>
+            <option value="python">Python</option>
+            <option value="java">Java</option>
+            <option value="c">C</option>
+            <option value="cpp">C++</option>
+            <option value="csharp">C#</option>
+            <option value="go">Go</option>
+            <option value="rust">Rust</option>
+            <option value="ruby">Ruby</option>
+            <option value="php">PHP</option>
+            <option value="sql">SQL</option>
+            <option value="bash">Bash</option>
+            <option value="html">HTML</option>
+            <option value="css">CSS</option>
+            <option value="json">JSON</option>
+            <option value="yaml">YAML</option>
+            <option value="xml">XML</option>
+            <option value="markdown">Markdown</option>
+          </select>
+          <button id="btn-preview" title="Toggle syntax preview">Preview</button>
+          <button id="btn-delete" title="Delete note">Delete</button>
+        </div>
+        <textarea id="note-content" placeholder="Paste or type your text here…" spellcheck="false"></textarea>
+        <pre id="note-preview" class="hidden"><code></code></pre>
+      </div>
+    </main>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
