@@ -811,6 +811,10 @@ function togglePreview() {
 function updatePreview() {
   if (!previewing) return;
 
+  // Always clear hljs state so re-highlighting works without warnings
+  const codeEl = previewEl.querySelector("code");
+  if (codeEl) delete codeEl.dataset.highlighted;
+
   if (isMarkdownMode()) {
     previewEl.classList.add("hidden");
     mdPreviewEl.classList.remove("hidden");
@@ -824,7 +828,6 @@ function updatePreview() {
   const code = previewEl.querySelector("code");
   code.textContent = contentArea.value;
   code.className = "";
-  delete code.dataset.highlighted;
   previewEl.classList.remove("line-numbers");
 
   const lang = langSelect.value;
