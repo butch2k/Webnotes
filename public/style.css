@@ -70,6 +70,24 @@ body {
   border: 0;
 }
 
+/* Skip link */
+.skip-link {
+  position: absolute;
+  top: -100%;
+  left: 16px;
+  background: var(--accent);
+  color: var(--accent-on);
+  padding: 8px 16px;
+  border-radius: 0 0 6px 6px;
+  z-index: 200;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.skip-link:focus {
+  top: 0;
+}
+
 /* Offline banner */
 .offline-banner {
   background: var(--warning-bg);
@@ -437,6 +455,9 @@ body:has(.offline-banner:not(.hidden)) .layout {
   position: relative;
 }
 #note-list li:hover .btn-unfile {
+  opacity: 1;
+}
+#note-list li:focus-within .btn-unfile {
   opacity: 1;
 }
 .btn-unfile:hover {

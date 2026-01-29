@@ -30,6 +30,9 @@ function createApp(dbModule) {
           connectSrc: ["'self'", "https://esm.sh"],
         },
       },
+      referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+      frameguard: { action: "deny" },
+      crossOriginEmbedderPolicy: false,
     })
   );
 
@@ -158,6 +161,9 @@ function createApp(dbModule) {
       if (!ids.every((id) => typeof id === "number" || /^\d+$/.test(id))) {
         return res.status(400).json({ error: "invalid ids" });
       }
+      if (ids.length > 100) {
+        return res.status(400).json({ error: "too many ids (max 100)" });
+      }
       if (action === "delete") {
         const count = await db.bulkDelete(ids);
         return res.json({ deleted: count });
@@ -230,7 +236,7 @@ function createApp(dbModule) {
 
   // Error handler
   app.use((err, req, res, _next) => {
-    console.error(err);
+    console.error(req.method, req.url, err);
     res.status(500).json({ error: "Internal server error" });
   });
 

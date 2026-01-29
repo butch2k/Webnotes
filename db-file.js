@@ -48,10 +48,22 @@ function save() {
 }
 
 function saveSync() {
-  const tmp = DB_FILE + ".tmp";
-  fs.writeFileSync(tmp, JSON.stringify({ notes, nextId, versions }, null, 2));
-  fs.renameSync(tmp, DB_FILE);
+  try {
+    const tmp = DB_FILE + ".tmp";
+    fs.writeFileSync(tmp, JSON.stringify({ notes, nextId, versions }, null, 2));
+    fs.renameSync(tmp, DB_FILE);
+  } catch (err) {
+    console.error("Failed to save data file:", err);
+  }
 }
+
+process.on("exit", () => {
+  if (saveTimer) {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+    saveSync();
+  }
+});
 
 async function initDb() {
   if (!fs.existsSync(DATA_DIR)) {
