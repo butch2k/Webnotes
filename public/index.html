@@ -85,7 +85,7 @@
     <main class="editor" aria-label="Note editor">
       <!-- Mobile header -->
       <div id="mobile-header" class="mobile-header">
-        <button id="btn-hamburger" class="btn-hamburger" aria-label="Open sidebar">&#9776;</button>
+        <button id="btn-hamburger" class="btn-hamburger" aria-label="Open sidebar" aria-expanded="false" aria-controls="sidebar">&#9776;</button>
         <span class="mobile-title">Webnotes</span>
       </div>
       <div id="empty-state" class="empty-state">
@@ -143,7 +143,7 @@
           <div class="tags-wrapper">
             <div id="note-tags" class="tag-chips" aria-label="Tags"></div>
             <label for="tag-input" class="sr-only">Add tag</label>
-            <input id="tag-input" type="text" placeholder="Add tag…" title="Add tag" aria-label="Add tag" autocomplete="off">
+            <input id="tag-input" type="text" placeholder="Add tag…" title="Add tag" aria-label="Add tag" aria-controls="tag-suggestions" aria-autocomplete="list" autocomplete="off">
             <ul id="tag-suggestions" class="nb-suggestions hidden" role="listbox"></ul>
           </div>
         </div>
