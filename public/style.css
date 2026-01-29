@@ -21,9 +21,22 @@ body {
   border: 0;
 }
 
+/* Offline banner */
+.offline-banner {
+  background: #f9e2af;
+  color: #1e1e2e;
+  text-align: center;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
 .layout {
   display: flex;
   height: 100vh;
+}
+body:has(.offline-banner:not(.hidden)) .layout {
+  height: calc(100vh - 37px);
 }
 
 /* Sidebar */
