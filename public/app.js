@@ -1235,9 +1235,9 @@ function renderMarkdown(src) {
       }
       i++; // skip closing ```
       const codeRaw = codeLines.join("\n");
-      // Mermaid diagram
+      // Mermaid diagram — use <pre> to preserve raw source; rendered in updatePreview
       if (lang === "mermaid") {
-        out.push('<div class="mermaid">' + esc(codeRaw) + '</div>');
+        out.push('<pre class="mermaid-source" style="display:none">' + esc(codeRaw) + '</pre><div class="mermaid"></div>');
         continue;
       }
       let codeHtml = esc(codeRaw);
@@ -1444,10 +1444,20 @@ function updatePreview() {
     mdPreviewEl.innerHTML = sanitizeHtml(rendered);
     // Render mermaid diagrams
     if (typeof mermaid !== "undefined") {
-      const mermaidEls = mdPreviewEl.querySelectorAll(".mermaid");
-      if (mermaidEls.length > 0) {
-        mermaidEls.forEach(el => { el.removeAttribute("data-processed"); });
-        try { mermaid.run({ nodes: mermaidEls }); } catch (e) { console.warn("Mermaid render error:", e); }
+      const mermaidSources = mdPreviewEl.querySelectorAll(".mermaid-source");
+      if (mermaidSources.length > 0) {
+        const mermaidEls = [];
+        mermaidSources.forEach(pre => {
+          const div = pre.nextElementSibling;
+          if (div && div.classList.contains("mermaid")) {
+            div.textContent = pre.textContent;
+            div.removeAttribute("data-processed");
+            mermaidEls.push(div);
+          }
+        });
+        if (mermaidEls.length > 0) {
+          try { mermaid.run({ nodes: mermaidEls }); } catch (e) { console.warn("Mermaid render error:", e); }
+        }
       }
     }
     return;
@@ -1753,21 +1763,21 @@ document.addEventListener("keydown", (e) => {
     return;
   }
 
-  // Ctrl+A selects note content when a note is open and focus is not in an input
+  // Ctrl+A selects preview content when previewing; otherwise let editor handle it
   if ((e.ctrlKey || e.metaKey) && e.key === "a" && currentNoteId && !editorArea.classList.contains("hidden")) {
     const tag = document.activeElement && document.activeElement.tagName;
-    if (tag !== "TEXTAREA" && tag !== "INPUT") {
+    if (tag === "TEXTAREA" || tag === "INPUT") { /* let native handle */ }
+    else if (previewing) {
       e.preventDefault();
-      if (previewing) {
-        const target = !mdPreviewEl.classList.contains("hidden") ? mdPreviewEl : previewEl;
-        const sel = window.getSelection();
-        const range = document.createRange();
-        range.selectNodeContents(target);
-        sel.removeAllRanges();
-        sel.addRange(range);
-      }
+      const target = !mdPreviewEl.classList.contains("hidden") ? mdPreviewEl : previewEl;
+      const sel = window.getSelection();
+      const range = document.createRange();
+      range.selectNodeContents(target);
+      sel.removeAllRanges();
+      sel.addRange(range);
       return;
     }
+    // When not previewing, let CodeMirror handle Ctrl+A natively
   }
 
   if (e.altKey && e.key === "n") {
@@ -1857,6 +1867,18 @@ fileInput.addEventListener("change", () => {
 btnNew.addEventListener("click", createNote);
 btnDelete.addEventListener("click", deleteNote);
 btnPreview.addEventListener("click", togglePreview);
+// Intercept anchor clicks inside markdown preview to scroll within container only
+mdPreviewEl.addEventListener("click", (e) => {
+  const a = e.target.closest("a[href^='#']");
+  if (!a) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const id = a.getAttribute("href").slice(1);
+  const target = mdPreviewEl.querySelector("#" + CSS.escape(id));
+  if (target) {
+    mdPreviewEl.scrollTop = target.offsetTop - mdPreviewEl.offsetTop;
+  }
+});
 // Wrap toggle
 btnWrap.classList.toggle("active", lineWrap);
 btnWrap.setAttribute("aria-pressed", String(lineWrap));
