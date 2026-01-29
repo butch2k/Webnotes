@@ -1377,6 +1377,17 @@ contentArea.addEventListener("focus", () => { tabTrapped = true; });
 
 // === Keyboard shortcuts ===
 document.addEventListener("keydown", (e) => {
+  // Ctrl+A selects note content when a note is open and focus is not in an input
+  if ((e.ctrlKey || e.metaKey) && e.key === "a" && currentNoteId && !editorArea.classList.contains("hidden")) {
+    const tag = document.activeElement && document.activeElement.tagName;
+    if (tag !== "TEXTAREA" && tag !== "INPUT") {
+      e.preventDefault();
+      contentArea.focus();
+      contentArea.select();
+      return;
+    }
+  }
+
   if (e.altKey && e.key === "n") {
     e.preventDefault();
     createNote();
