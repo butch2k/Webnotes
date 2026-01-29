@@ -36,11 +36,14 @@ async function initDb() {
   console.log(`File-based storage: ${DB_FILE} (${notes.length} notes)`);
 }
 
-async function listNotes(q) {
+async function listNotes(q, notebook) {
   let result = [...notes].sort((a, b) => {
     if ((a.pinned || false) !== (b.pinned || false)) return a.pinned ? -1 : 1;
     return new Date(b.updated_at) - new Date(a.updated_at);
   });
+  if (notebook !== undefined && notebook !== null) {
+    result = result.filter((n) => (n.notebook || "") === notebook);
+  }
   if (q) {
     const terms = q.toLowerCase().split(/\s+/).filter(Boolean);
     result = result.filter((n) => {
@@ -55,7 +58,7 @@ async function getNote(id) {
   return notes.find((n) => n.id === Number(id)) || null;
 }
 
-async function createNote({ title, content, language }) {
+async function createNote({ title, content, language, notebook }) {
   const now = new Date().toISOString();
   const note = {
     id: nextId++,
@@ -63,6 +66,7 @@ async function createNote({ title, content, language }) {
     content: content || "",
     language: language || "plaintext",
     pinned: false,
+    notebook: notebook || "",
     created_at: now,
     updated_at: now,
   };
@@ -71,13 +75,14 @@ async function createNote({ title, content, language }) {
   return note;
 }
 
-async function updateNote(id, { title, content, language, pinned }) {
+async function updateNote(id, { title, content, language, pinned, notebook }) {
   const note = notes.find((n) => n.id === Number(id));
   if (!note) return null;
   if (title !== undefined) note.title = title;
   if (content !== undefined) note.content = content;
   if (language !== undefined) note.language = language;
   if (pinned !== undefined) note.pinned = pinned;
+  if (notebook !== undefined) note.notebook = notebook;
   note.updated_at = new Date().toISOString();
   save();
   return note;
@@ -91,8 +96,21 @@ async function deleteNote(id) {
   return true;
 }
 
+async function listNotebooks() {
+  const counts = {};
+  notes.forEach((n) => {
+    const nb = n.notebook || "";
+    if (nb) {
+      counts[nb] = (counts[nb] || 0) + 1;
+    }
+  });
+  return Object.entries(counts)
+    .map(([notebook, count]) => ({ notebook, count }))
+    .sort((a, b) => a.notebook.localeCompare(b.notebook));
+}
+
 async function healthCheck() {
   return { status: "ok", db: "file" };
 }
 
-module.exports = { initDb, listNotes, getNote, createNote, updateNote, deleteNote, healthCheck };
+module.exports = { initDb, listNotes, listNotebooks, getNote, createNote, updateNote, deleteNote, healthCheck };

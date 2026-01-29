@@ -60,6 +60,10 @@
           <option value="title-desc">Title Z–A</option>
         </select>
       </div>
+      <div id="notebook-bar" class="notebook-bar">
+        <button id="nb-all" class="nb-tab active" aria-pressed="true">All</button>
+        <button id="nb-uncategorized" class="nb-tab" aria-pressed="false">Unfiled</button>
+      </div>
       <ul id="note-list" role="listbox" aria-label="Notes"></ul>
     </aside>
 
@@ -102,6 +106,9 @@
             <option value="dockerfile">Dockerfile</option>
             <option value="markdown">Markdown</option>
           </select>
+          <label for="note-notebook" class="sr-only">Notebook</label>
+          <input id="note-notebook" type="text" placeholder="Notebook…" list="notebook-list" title="Assign to notebook" aria-label="Notebook name">
+          <datalist id="notebook-list"></datalist>
           <button id="btn-pin" class="toolbar-btn" title="Pin/unpin note" aria-pressed="false">Pin</button>
           <button id="btn-preview" class="toolbar-btn" title="Toggle syntax preview (Alt+P)" aria-pressed="false">Preview</button>
           <button id="btn-copy" class="toolbar-btn" title="Copy to clipboard (Alt+C)" aria-label="Copy to clipboard">Copy</button>

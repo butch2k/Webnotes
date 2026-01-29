@@ -169,6 +169,54 @@ body:has(.offline-banner:not(.hidden)) .layout {
 #sort-select:focus { border-color: var(--accent); outline: 1px solid var(--accent); }
 #sort-select:focus:not(:focus-visible) { outline: none; }
 
+/* Notebook bar */
+.notebook-bar {
+  display: flex;
+  gap: 4px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+.nb-tab {
+  background: none;
+  border: 1px solid var(--border-input);
+  border-radius: 14px;
+  padding: 3px 10px;
+  font-size: 11px;
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.nb-tab:hover { background: var(--bg-hover); }
+.nb-tab.active {
+  background: var(--accent);
+  color: var(--accent-on);
+  border-color: var(--accent);
+}
+.nb-tab:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.nb-tab:focus:not(:focus-visible) { outline: none; }
+
+#note-notebook {
+  background: var(--bg-input);
+  border: 1px solid var(--border-input);
+  color: var(--text-primary);
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  outline: none;
+  width: 120px;
+}
+#note-notebook:focus { border-color: var(--accent); outline: 1px solid var(--accent); }
+#note-notebook:focus:not(:focus-visible) { outline: none; }
+#note-notebook::placeholder { color: var(--text-muted); }
+
+.note-item-nb {
+  color: var(--accent);
+  font-size: 10px;
+}
+
 #note-list {
   list-style: none;
   overflow-y: auto;

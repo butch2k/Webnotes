@@ -37,9 +37,13 @@ function validateNote(req, res, next) {
     return res.status(400).json({ error: "language too long (max 50)" });
   if (content && content.length > 1024 * 1024)
     return res.status(400).json({ error: "content too long (max 1 MB)" });
-  const { pinned } = req.body;
+  const { pinned, notebook } = req.body;
   if (pinned !== undefined && typeof pinned !== "boolean")
     return res.status(400).json({ error: "pinned must be a boolean" });
+  if (notebook !== undefined && typeof notebook !== "string")
+    return res.status(400).json({ error: "notebook must be a string" });
+  if (notebook && notebook.length > 100)
+    return res.status(400).json({ error: "notebook too long (max 100)" });
   next();
 }
 
@@ -62,11 +66,22 @@ app.get("/health", async (req, res) => {
   }
 });
 
+// List notebooks
+app.get("/api/notebooks", async (req, res, next) => {
+  try {
+    const notebooks = await db.listNotebooks();
+    res.json(notebooks);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // List notes
 app.get("/api/notes", async (req, res, next) => {
   try {
     const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
-    const notes = await db.listNotes(q || null);
+    const notebook = typeof req.query.notebook === "string" ? req.query.notebook : undefined;
+    const notes = await db.listNotes(q || null, notebook);
     res.json(notes);
   } catch (err) {
     next(err);

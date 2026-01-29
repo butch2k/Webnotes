@@ -20,11 +20,16 @@ const searchInput = document.getElementById("search-input");
 const sortSelect = document.getElementById("sort-select");
 const statusStats = document.getElementById("status-stats");
 const dropZone = document.getElementById("drop-zone");
+const notebookInput = document.getElementById("note-notebook");
+const notebookList = document.getElementById("notebook-list");
+const notebookBar = document.getElementById("notebook-bar");
 
 let currentNoteId = null;
 let currentNotePinned = false;
+let currentNotebook = null; // null = all, "" = unfiled, "name" = specific
 let saveTimeout = null;
 let searchTimeout = null;
+let dirty = false;
 let previewing = false;
 let online = navigator.onLine;
 let searchQuery = "";
@@ -240,12 +245,67 @@ sortSelect.addEventListener("change", () => {
   renderNoteList(lastNotes);
 });
 
+// === Notebooks ===
+let notebooks = [];
+
+async function loadNotebooks() {
+  try {
+    notebooks = await api("/notebooks");
+  } catch {
+    notebooks = [];
+  }
+  renderNotebookTabs();
+  updateNotebookDatalist();
+}
+
+function renderNotebookTabs() {
+  // Keep "All" and "Unfiled" buttons, remove dynamic tabs
+  const existing = notebookBar.querySelectorAll(".nb-tab-dynamic");
+  existing.forEach((el) => el.remove());
+
+  notebooks.forEach((nb) => {
+    const btn = document.createElement("button");
+    btn.className = "nb-tab nb-tab-dynamic";
+    btn.textContent = nb.notebook + " (" + nb.count + ")";
+    btn.setAttribute("aria-pressed", currentNotebook === nb.notebook ? "true" : "false");
+    if (currentNotebook === nb.notebook) btn.classList.add("active");
+    btn.onclick = () => selectNotebook(nb.notebook);
+    notebookBar.appendChild(btn);
+  });
+
+  // Update All/Unfiled active state
+  document.getElementById("nb-all").classList.toggle("active", currentNotebook === null);
+  document.getElementById("nb-all").setAttribute("aria-pressed", String(currentNotebook === null));
+  document.getElementById("nb-uncategorized").classList.toggle("active", currentNotebook === "");
+  document.getElementById("nb-uncategorized").setAttribute("aria-pressed", String(currentNotebook === ""));
+}
+
+function updateNotebookDatalist() {
+  notebookList.innerHTML = "";
+  notebooks.forEach((nb) => {
+    const opt = document.createElement("option");
+    opt.value = nb.notebook;
+    notebookList.appendChild(opt);
+  });
+}
+
+function selectNotebook(nb) {
+  currentNotebook = nb;
+  renderNotebookTabs();
+  loadNotes();
+}
+
+document.getElementById("nb-all").addEventListener("click", () => selectNotebook(null));
+document.getElementById("nb-uncategorized").addEventListener("click", () => selectNotebook(""));
+
 // === Note list ===
 async function loadNotes() {
   try {
-    const path = searchQuery
-      ? "/notes?q=" + encodeURIComponent(searchQuery)
-      : "/notes";
+    let path = "/notes";
+    const params = [];
+    if (searchQuery) params.push("q=" + encodeURIComponent(searchQuery));
+    if (currentNotebook !== null) params.push("notebook=" + encodeURIComponent(currentNotebook));
+    if (params.length) path += "?" + params.join("&");
     const notes = await api(path);
     setCachedNotes(notes);
     lastNotes = notes;
@@ -278,9 +338,10 @@ function renderNoteList(notes) {
       month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
     });
     const pinIcon = n.pinned ? '<span class="pin-icon" aria-label="Pinned">&#x1F4CC;</span> ' : "";
+    const nbLabel = n.notebook ? ' &middot; <span class="note-item-nb">' + escapeHtml(n.notebook) + '</span>' : "";
     li.innerHTML = `
       <span class="note-item-title">${pinIcon}${escapeHtml(n.title)}</span>
-      <span class="note-item-meta">${escapeHtml(n.language)} &middot; ${date}</span>
+      <span class="note-item-meta">${escapeHtml(n.language)} &middot; ${date}${nbLabel}</span>
     `;
     li.onclick = () => openNote(n.id);
     li.onkeydown = (e) => {
@@ -310,6 +371,7 @@ async function openNote(id) {
     titleInput.value = note.title;
     langSelect.value = note.language;
     contentArea.value = note.content;
+    notebookInput.value = note.notebook || "";
     showEditor();
     updatePinButton();
     updateStats();
@@ -323,6 +385,7 @@ async function openNote(id) {
       titleInput.value = cached.title;
       langSelect.value = cached.language || "plaintext";
       contentArea.value = cached.content || "";
+      notebookInput.value = cached.notebook || "";
       showEditor();
       updatePinButton();
       updateStats();
@@ -334,22 +397,26 @@ async function openNote(id) {
 
 async function createNote() {
   try {
+    const nb = currentNotebook && currentNotebook !== "" ? currentNotebook : "";
     const note = await api("/notes", {
       method: "POST",
-      body: JSON.stringify({ title: "Untitled", content: "", language: "plaintext" }),
+      body: JSON.stringify({ title: "Untitled", content: "", language: "plaintext", notebook: nb }),
     });
     currentNoteId = note.id;
     currentNotePinned = false;
     titleInput.value = note.title;
     langSelect.value = note.language;
     contentArea.value = note.content;
+    notebookInput.value = note.notebook || "";
     showEditor();
     updatePinButton();
     updateStats();
     titleInput.focus();
     titleInput.select();
     await loadNotes();
+    loadNotebooks();
   } catch {
+    const nb = currentNotebook && currentNotebook !== "" ? currentNotebook : "";
     const tempId = "temp_" + Date.now();
     const tempNote = {
       id: tempId,
@@ -357,10 +424,11 @@ async function createNote() {
       content: "",
       language: "plaintext",
       pinned: false,
+      notebook: nb,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
-    enqueue({ type: "create", tempId, data: { title: "Untitled", content: "", language: "plaintext" } });
+    enqueue({ type: "create", tempId, data: { title: "Untitled", content: "", language: "plaintext", notebook: nb } });
     const cached = getCachedNotes();
     cached.unshift(tempNote);
     setCachedNotes(cached);
@@ -369,6 +437,7 @@ async function createNote() {
     titleInput.value = tempNote.title;
     langSelect.value = tempNote.language;
     contentArea.value = tempNote.content;
+    notebookInput.value = nb;
     showEditor();
     updatePinButton();
     updateStats();
@@ -383,19 +452,22 @@ async function createNoteFromFile(filename, content, language) {
   try {
     const note = await api("/notes", {
       method: "POST",
-      body: JSON.stringify({ title: filename, content, language }),
+      body: JSON.stringify({ title: filename, content, language, notebook: currentNotebook && currentNotebook !== "" ? currentNotebook : "" }),
     });
     currentNoteId = note.id;
     currentNotePinned = false;
     titleInput.value = note.title;
     langSelect.value = note.language;
     contentArea.value = note.content;
+    notebookInput.value = note.notebook || "";
     showEditor();
     updatePinButton();
     updateStats();
     if (note.content) togglePreview();
     await loadNotes();
+    loadNotebooks();
   } catch {
+    const nb = currentNotebook && currentNotebook !== "" ? currentNotebook : "";
     const tempId = "temp_" + Date.now();
     const tempNote = {
       id: tempId,
@@ -403,10 +475,11 @@ async function createNoteFromFile(filename, content, language) {
       content,
       language,
       pinned: false,
+      notebook: nb,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
-    enqueue({ type: "create", tempId, data: { title: filename, content, language } });
+    enqueue({ type: "create", tempId, data: { title: filename, content, language, notebook: nb } });
     const cached = getCachedNotes();
     cached.unshift(tempNote);
     setCachedNotes(cached);
@@ -415,6 +488,7 @@ async function createNoteFromFile(filename, content, language) {
     titleInput.value = tempNote.title;
     langSelect.value = tempNote.language;
     contentArea.value = tempNote.content;
+    notebookInput.value = nb;
     showEditor();
     updatePinButton();
     updateStats();
@@ -425,6 +499,7 @@ async function createNoteFromFile(filename, content, language) {
 }
 
 function scheduleSave() {
+  dirty = true;
   clearTimeout(saveTimeout);
   saveTimeout = setTimeout(saveNote, 600);
 }
@@ -435,12 +510,14 @@ async function saveNote() {
     title: titleInput.value || "Untitled",
     content: contentArea.value,
     language: langSelect.value,
+    notebook: notebookInput.value.trim(),
   };
   try {
     await api("/notes/" + currentNoteId, {
       method: "PUT",
       body: JSON.stringify(data),
     });
+    dirty = false;
     flashSaved();
     loadNotes();
   } catch {
@@ -451,6 +528,7 @@ async function saveNote() {
       Object.assign(cached[idx], data, { updated_at: new Date().toISOString() });
       setCachedNotes(cached);
     }
+    dirty = false;
     flashSaved("Saved locally");
     lastNotes = getCachedNotes();
     renderNoteList(lastNotes);
@@ -833,6 +911,7 @@ function setupDragDrop(el) {
 
 // === UI helpers ===
 function showEditor() {
+  dirty = false;
   editorArea.classList.remove("hidden");
   emptyState.classList.add("hidden");
   previewing = false;
@@ -963,11 +1042,24 @@ langSelect.addEventListener("change", () => {
   scheduleSave();
   updatePreview();
 });
+notebookInput.addEventListener("change", () => {
+  scheduleSave();
+  loadNotebooks();
+});
+
+// === Unsaved changes warning ===
+window.addEventListener("beforeunload", (e) => {
+  if (dirty) {
+    e.preventDefault();
+    e.returnValue = "";
+  }
+});
 
 // === Init ===
 setTheme(getTheme());
 setOnline(navigator.onLine);
 loadNotes();
+loadNotebooks();
 flushQueue();
 setupDragDrop(dropZone);
 setupDragDrop(contentArea);
