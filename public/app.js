@@ -824,6 +824,7 @@ function updatePreview() {
   const code = previewEl.querySelector("code");
   code.textContent = contentArea.value;
   code.className = "";
+  delete code.dataset.highlighted;
   previewEl.classList.remove("line-numbers");
 
   const lang = langSelect.value;
