@@ -13,6 +13,7 @@ app.use(
         defaultSrc: ["'self'"],
         scriptSrc: ["'self'", "https://cdnjs.cloudflare.com", "'sha256-rK+Mx+8ZfQh6wMaytxOiKWAGb/f1Z9xO2jXMaczp21Q='", "'sha256-Nny8H/je5llKyTsleHxYL8feCRalb8GOIQ20BMZf8DE='"],
         workerSrc: ["'self'"],
+        imgSrc: ["'self'", "https:", "data:"],
         styleSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],
       },
     },
@@ -34,6 +35,8 @@ function validateNote(req, res, next) {
     return res.status(400).json({ error: "title too long (max 255)" });
   if (language && language.length > 50)
     return res.status(400).json({ error: "language too long (max 50)" });
+  if (content && content.length > 1024 * 1024)
+    return res.status(400).json({ error: "content too long (max 1 MB)" });
   const { pinned } = req.body;
   if (pinned !== undefined && typeof pinned !== "boolean")
     return res.status(400).json({ error: "pinned must be a boolean" });

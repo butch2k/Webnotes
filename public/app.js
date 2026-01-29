@@ -488,7 +488,7 @@ function updatePinButton() {
 
 async function deleteNote() {
   if (!currentNoteId) return;
-  if (!confirm("Delete this note?")) return;
+  if (!confirm("Delete \"" + (titleInput.value || "Untitled") + "\"?")) return;
   try {
     await api("/notes/" + currentNoteId, { method: "DELETE" });
   } catch {
@@ -571,10 +571,22 @@ function renderMarkdown(src) {
   }
 
   function inline(text) {
+    // Sanitize URLs — only allow http(s) and relative paths
+    function safeUrl(url) {
+      const decoded = url.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"');
+      if (/^https?:\/\//i.test(decoded) || /^[/#.]/.test(decoded)) return url;
+      return "";
+    }
     // Images before links
-    text = text.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" style="max-width:100%">');
+    text = text.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, url) => {
+      const safe = safeUrl(url);
+      return safe ? '<img src="' + safe + '" alt="' + alt + '" style="max-width:100%">' : alt;
+    });
     // Links
-    text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" rel="noopener">$1</a>');
+    text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, url) => {
+      const safe = safeUrl(url);
+      return safe ? '<a href="' + safe + '" rel="noopener">' + label + '</a>' : label;
+    });
     // Bold + italic
     text = text.replace(/\*\*\*(.+?)\*\*\*/g, "<strong><em>$1</em></strong>");
     text = text.replace(/___(.+?)___/g, "<strong><em>$1</em></strong>");
