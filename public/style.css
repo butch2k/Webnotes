@@ -75,6 +75,23 @@ body:has(.offline-banner:not(.hidden)) .layout {
 }
 #btn-new:hover { background: #b4befe; }
 
+.sidebar-search {
+  padding: 8px;
+  border-bottom: 1px solid #313244;
+}
+#search-input {
+  width: 100%;
+  background: #313244;
+  border: 1px solid #45475a;
+  color: #cdd6f4;
+  padding: 7px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  outline: none;
+}
+#search-input:focus-visible { border-color: #cba6f7; outline: 1px solid #cba6f7; }
+#search-input::placeholder { color: #6c7086; }
+
 #note-list {
   list-style: none;
   overflow-y: auto;
@@ -109,6 +126,13 @@ body:has(.offline-banner:not(.hidden)) .layout {
   font-size: 11px;
   color: #9399b2;
   margin-top: 2px;
+}
+
+.note-list-empty {
+  color: #6c7086;
+  font-size: 13px;
+  text-align: center;
+  padding: 16px 12px;
 }
 
 /* Editor */
@@ -161,23 +185,27 @@ body:has(.offline-banner:not(.hidden)) .layout {
 }
 #note-lang:focus-visible { border-color: #cba6f7; outline: 1px solid #cba6f7; }
 
-#btn-preview, #btn-delete {
+.toolbar-btn {
   padding: 8px 14px;
   border: none;
   border-radius: 6px;
   cursor: pointer;
   font-size: 13px;
   font-weight: 500;
-}
-#btn-preview {
   background: #45475a;
   color: #cdd6f4;
 }
-#btn-preview:hover { background: #585b70; }
-#btn-preview:focus-visible { outline: 2px solid #cba6f7; outline-offset: 2px; }
-#btn-preview.active { background: #cba6f7; color: #1e1e2e; }
+.toolbar-btn:hover { background: #585b70; }
+.toolbar-btn:focus-visible { outline: 2px solid #cba6f7; outline-offset: 2px; }
+.toolbar-btn.active { background: #cba6f7; color: #1e1e2e; }
 
 #btn-delete {
+  padding: 8px 14px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
   background: #45475a;
   color: #f38ba8;
 }
@@ -206,14 +234,33 @@ body:has(.offline-banner:not(.hidden)) .layout {
   overflow: auto;
   margin: 0;
   border-radius: 0;
+  counter-reset: line;
 }
 #note-preview code {
   font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", "Consolas", monospace;
   font-size: 14px;
   line-height: 1.6;
-  padding: 16px !important;
+  padding: 16px 16px 16px 60px !important;
   min-height: 100%;
   display: block;
+}
+#note-preview.line-numbers code {
+  counter-reset: line;
+}
+#note-preview.line-numbers code .line {
+  display: block;
+  position: relative;
+}
+#note-preview.line-numbers code .line::before {
+  counter-increment: line;
+  content: counter(line);
+  position: absolute;
+  left: -44px;
+  width: 32px;
+  text-align: right;
+  color: #585b70;
+  user-select: none;
+  pointer-events: none;
 }
 
 .hidden { display: none !important; }
@@ -225,5 +272,6 @@ body:has(.offline-banner:not(.hidden)) .layout {
   padding: 4px 8px;
   opacity: 0;
   transition: opacity 0.3s;
+  white-space: nowrap;
 }
 .save-indicator.show { opacity: 1; }

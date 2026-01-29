@@ -46,7 +46,7 @@ function validateId(req, res, next) {
 app.get("/api/notes", async (req, res, next) => {
   try {
     const { rows } = await pool.query(
-      "SELECT id, title, language, created_at, updated_at FROM notes ORDER BY updated_at DESC"
+      "SELECT id, title, content, language, created_at, updated_at FROM notes ORDER BY updated_at DESC"
     );
     res.json(rows);
   } catch (err) {

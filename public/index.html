@@ -19,7 +19,11 @@
     <aside class="sidebar" aria-label="Notes list">
       <div class="sidebar-header">
         <h1>Webnotes</h1>
-        <button id="btn-new" title="New note">+ New</button>
+        <button id="btn-new" title="New note (Ctrl+N)">+ New</button>
+      </div>
+      <div class="sidebar-search">
+        <label for="search-input" class="sr-only">Search notes</label>
+        <input id="search-input" type="search" placeholder="Search notes…" autocomplete="off">
       </div>
       <ul id="note-list" role="listbox" aria-label="Notes"></ul>
     </aside>
@@ -35,6 +39,7 @@
           <input id="note-title" type="text" placeholder="Title…">
           <label for="note-lang" class="sr-only">Syntax language</label>
           <select id="note-lang">
+            <option value="auto">Auto-detect</option>
             <option value="plaintext">Plain text</option>
             <option value="javascript">JavaScript</option>
             <option value="typescript">TypeScript</option>
@@ -56,7 +61,8 @@
             <option value="xml">XML</option>
             <option value="markdown">Markdown</option>
           </select>
-          <button id="btn-preview" title="Toggle syntax preview" aria-pressed="false">Preview</button>
+          <button id="btn-preview" class="toolbar-btn" title="Toggle syntax preview (Ctrl+P)" aria-pressed="false">Preview</button>
+          <button id="btn-copy" class="toolbar-btn" title="Copy to clipboard (Ctrl+Shift+C)">Copy</button>
           <button id="btn-delete" title="Delete note">Delete</button>
           <span class="save-indicator" role="status" aria-live="polite"></span>
         </div>
