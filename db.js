@@ -160,45 +160,61 @@ async function createNote({ title, content, language, tags }) {
 }
 
 async function updateNote(id, { title, content, language, pinned, tags }) {
-  // Save version before modifying if content changes
-  if (content !== undefined) {
-    const current = await getNote(id);
-    if (current && current.content !== content) {
-      await pool.query(
-        `INSERT INTO note_versions (note_id, title, content, language, saved_at) VALUES ($1, $2, $3, $4, $5)`,
-        [id, current.title, current.content, current.language, current.updated_at]
-      );
-      // Keep only last 20 versions
-      await pool.query(
-        `DELETE FROM note_versions WHERE note_id = $1 AND id NOT IN (
-          SELECT id FROM note_versions WHERE note_id = $1 ORDER BY saved_at DESC LIMIT 20
-        )`,
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    // Save version before modifying if content changes
+    if (content !== undefined) {
+      const { rows: currentRows } = await client.query(
+        `SELECT ${NOTE_COLS} FROM notes WHERE id = $1 FOR UPDATE`,
         [id]
       );
+      const current = currentRows[0] || null;
+      if (current && current.content !== content) {
+        await client.query(
+          `INSERT INTO note_versions (note_id, title, content, language, saved_at) VALUES ($1, $2, $3, $4, $5)`,
+          [id, current.title, current.content, current.language, current.updated_at]
+        );
+        // Keep only last 20 versions
+        await client.query(
+          `DELETE FROM note_versions WHERE note_id = $1 AND id NOT IN (
+            SELECT id FROM note_versions WHERE note_id = $1 ORDER BY saved_at DESC LIMIT 20
+          )`,
+          [id]
+        );
+      }
     }
+
+    const tagsVal = tags !== undefined ? (Array.isArray(tags) ? tags.filter(Boolean) : []) : null;
+
+    const { rows } = await client.query(
+      `UPDATE notes SET
+         title = COALESCE($1, title),
+         content = COALESCE($2, content),
+         language = COALESCE($3, language),
+         pinned = COALESCE($4, pinned),
+         tags = COALESCE($5, tags),
+         updated_at = NOW()
+       WHERE id = $6 RETURNING ${NOTE_COLS}`,
+      [
+        title !== undefined ? title : null,
+        content !== undefined ? content : null,
+        language !== undefined ? language : null,
+        pinned !== undefined ? pinned : null,
+        tagsVal,
+        id,
+      ]
+    );
+
+    await client.query("COMMIT");
+    return rows[0] || null;
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
   }
-
-  const tagsVal = tags !== undefined ? (Array.isArray(tags) ? tags.filter(Boolean) : []) : null;
-
-  const { rows } = await pool.query(
-    `UPDATE notes SET
-       title = COALESCE($1, title),
-       content = COALESCE($2, content),
-       language = COALESCE($3, language),
-       pinned = COALESCE($4, pinned),
-       tags = COALESCE($5, tags),
-       updated_at = NOW()
-     WHERE id = $6 RETURNING ${NOTE_COLS}`,
-    [
-      title !== undefined ? title : null,
-      content !== undefined ? content : null,
-      language !== undefined ? language : null,
-      pinned !== undefined ? pinned : null,
-      tagsVal,
-      id,
-    ]
-  );
-  return rows[0] || null;
 }
 
 async function deleteNote(id) {

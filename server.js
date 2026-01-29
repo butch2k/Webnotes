@@ -48,10 +48,27 @@ function createApp(dbModule) {
     max: 10,
     message: { error: "Too many bulk requests, please try again later" },
   });
+  const writeLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 60,
+    message: { error: "Too many write requests, please try again later" },
+  });
 
   app.use(express.json({ limit: "5mb" }));
   app.use(express.static(path.join(__dirname, "public")));
   app.use("/api/", apiLimiter);
+
+  // CSRF protection: require custom header on state-changing requests.
+  // Browsers prevent cross-origin requests from setting custom headers without CORS preflight.
+  app.use("/api/", (req, res, next) => {
+    if (["POST", "PUT", "DELETE", "PATCH"].includes(req.method)) {
+      if (req.headers["content-type"]?.includes("application/json") || req.headers["x-requested-with"] === "XMLHttpRequest") {
+        return next();
+      }
+      return res.status(403).json({ error: "Missing required header" });
+    }
+    next();
+  });
 
   function validateNote(req, res, next) {
     const { title, content, language } = req.body;
@@ -116,11 +133,14 @@ function createApp(dbModule) {
   });
 
   // Rename tag
-  app.put("/api/tags/:name", async (req, res, next) => {
+  app.put("/api/tags/:name", writeLimiter, async (req, res, next) => {
     try {
       const oldName = req.params.name;
+      if (!oldName || oldName.length > 100) {
+        return res.status(400).json({ error: "invalid tag name" });
+      }
       const { newName } = req.body;
-      if (!newName || typeof newName !== "string" || newName.length > 100) {
+      if (!newName || typeof newName !== "string" || newName.trim().length === 0 || newName.trim().length > 100) {
         return res.status(400).json({ error: "invalid newName" });
       }
       const count = await db.renameTag(oldName, newName.trim());
@@ -131,7 +151,7 @@ function createApp(dbModule) {
   });
 
   // Delete tag (remove from all notes)
-  app.delete("/api/tags/:name", async (req, res, next) => {
+  app.delete("/api/tags/:name", writeLimiter, async (req, res, next) => {
     try {
       const count = await db.deleteTag(req.params.name);
       res.json({ updated: count });
@@ -170,8 +190,8 @@ function createApp(dbModule) {
         return res.json({ deleted: count });
       }
       if (action === "tag") {
-        if (typeof tag !== "string") {
-          return res.status(400).json({ error: "tag must be a string" });
+        if (typeof tag !== "string" || tag.trim().length === 0 || tag.trim().length > 100) {
+          return res.status(400).json({ error: "tag must be a non-empty string (max 100)" });
         }
         const count = await db.bulkTag(ids, tag);
         return res.json({ tagged: count });
@@ -204,7 +224,7 @@ function createApp(dbModule) {
   });
 
   // Create note
-  app.post("/api/notes", validateNote, async (req, res, next) => {
+  app.post("/api/notes", writeLimiter, validateNote, async (req, res, next) => {
     try {
       const note = await db.createNote(req.body);
       res.status(201).json(note);
@@ -214,7 +234,7 @@ function createApp(dbModule) {
   });
 
   // Update note
-  app.put("/api/notes/:id", validateId, validateNote, async (req, res, next) => {
+  app.put("/api/notes/:id", writeLimiter, validateId, validateNote, async (req, res, next) => {
     try {
       const note = await db.updateNote(req.params.id, req.body);
       if (!note) return res.status(404).json({ error: "Not found" });
@@ -225,7 +245,7 @@ function createApp(dbModule) {
   });
 
   // Delete note
-  app.delete("/api/notes/:id", validateId, async (req, res, next) => {
+  app.delete("/api/notes/:id", writeLimiter, validateId, async (req, res, next) => {
     try {
       const deleted = await db.deleteNote(req.params.id);
       if (!deleted) return res.status(404).json({ error: "Not found" });
@@ -237,7 +257,7 @@ function createApp(dbModule) {
 
   // Error handler
   app.use((err, req, res, _next) => {
-    console.error(req.method, req.url, err);
+    console.error(`[${new Date().toISOString()}] ${req.method} ${req.url}: ${err.message}`);
     res.status(500).json({ error: "Internal server error" });
   });
 

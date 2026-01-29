@@ -205,7 +205,9 @@ window.addEventListener("offline", () => setOnline(false));
 
 // === API helpers ===
 async function apiRaw(path, opts = {}) {
-  const headers = opts.body ? { "Content-Type": "application/json", ...opts.headers } : { ...opts.headers };
+  const headers = opts.body
+    ? { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest", ...opts.headers }
+    : { "X-Requested-With": "XMLHttpRequest", ...opts.headers };
   const res = await fetch("/api" + path, {
     ...opts,
     headers,
@@ -1157,7 +1159,7 @@ function renderMarkdown(src) {
     });
     text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, url) => {
       const safe = safeUrl(url);
-      return safe ? '<a href="' + safe + '" rel="noopener">' + label + '</a>' : label;
+      return safe ? '<a href="' + safe + '" rel="noopener noreferrer" target="_blank">' + label + '</a>' : label;
     });
     // Footnote references [^ref]
     text = text.replace(/\[\^(\w+)\]/g, (_, ref) => {
@@ -1576,6 +1578,8 @@ function closeVersionHistory() {
   } else {
     contentAreaContainer.classList.remove("hidden");
   }
+  // Restore focus to the history button
+  btnHistory.focus();
 }
 
 function restoreVersion() {
@@ -1631,7 +1635,7 @@ const EXT_TO_LANG = {
   yaml: "yaml", yml: "yaml",
   xml: "xml", svg: "xml",
   md: "markdown", markdown: "markdown",
-  ini: "ini", conf: "ini", cfg: "ini", toml: "ini",
+  ini: "ini", conf: "ini", cfg: "ini",
   dockerfile: "dockerfile",
   properties: "properties",
 };
@@ -1713,11 +1717,13 @@ function escapeHtml(s) {
 function openSidebar() {
   sidebar.classList.add("open");
   sidebarOverlay.classList.remove("hidden");
+  document.getElementById("btn-hamburger").setAttribute("aria-expanded", "true");
 }
 
 function closeSidebar() {
   sidebar.classList.remove("open");
   sidebarOverlay.classList.add("hidden");
+  document.getElementById("btn-hamburger").setAttribute("aria-expanded", "false");
 }
 
 document.getElementById("btn-hamburger").addEventListener("click", openSidebar);
