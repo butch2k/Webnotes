@@ -1204,6 +1204,46 @@ function renderMarkdown(src) {
       continue;
     }
 
+    // Table (GFM)
+    if (line.includes("|") && i + 1 < lines.length && /^\|?(\s*:?-+:?\s*\|)+\s*:?-+:?\s*\|?\s*$/.test(lines[i + 1])) {
+      closeList();
+      function parseCells(row) {
+        let s = row.trim();
+        if (s.startsWith("|")) s = s.substring(1);
+        if (s.endsWith("|")) s = s.substring(0, s.length - 1);
+        return s.split("|").map(c => c.trim());
+      }
+      const headers = parseCells(line);
+      const sepCells = parseCells(lines[i + 1]);
+      const aligns = sepCells.map(c => {
+        const left = c.startsWith(":");
+        const right = c.endsWith(":");
+        if (left && right) return "center";
+        if (right) return "right";
+        return "left";
+      });
+      i += 2;
+      let html = "<table><thead><tr>";
+      headers.forEach((h, idx) => {
+        const a = aligns[idx] || "left";
+        html += '<th style="text-align:' + a + '">' + inline(esc(h)) + "</th>";
+      });
+      html += "</tr></thead><tbody>";
+      while (i < lines.length && lines[i].includes("|") && lines[i].trim() !== "") {
+        const cells = parseCells(lines[i]);
+        html += "<tr>";
+        cells.forEach((c, idx) => {
+          const a = aligns[idx] || "left";
+          html += '<td style="text-align:' + a + '">' + inline(esc(c)) + "</td>";
+        });
+        html += "</tr>";
+        i++;
+      }
+      html += "</tbody></table>";
+      out.push(html);
+      continue;
+    }
+
     // Empty line
     if (line.trim() === "") {
       closeList();

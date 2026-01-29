@@ -826,6 +826,11 @@ body:has(.offline-banner:not(.hidden)) .layout {
 .md-preview a { color: var(--accent); text-decoration: underline; }
 .md-preview img { max-width: 100%; border-radius: 4px; }
 .md-preview del { opacity: 0.6; }
+.md-preview table { border-collapse: collapse; width: 100%; margin: 0.8em 0; }
+.md-preview th, .md-preview td { border: 1px solid var(--border); padding: 0.5em 0.75em; }
+.md-preview th { background: var(--bg-secondary); font-weight: 600; }
+.md-preview tbody tr:nth-child(even) { background: var(--bg-secondary); }
+.md-preview tbody tr:nth-child(odd) { background: var(--bg-primary); }
 .md-preview strong { color: var(--text-primary); }
 
 .hidden { display: none !important; }
