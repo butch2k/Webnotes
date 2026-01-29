@@ -220,6 +220,8 @@ searchInput.addEventListener("input", () => {
   clearTimeout(searchTimeout);
   if (online && searchQuery) {
     searchTimeout = setTimeout(serverSearch, 300);
+  } else if (!searchQuery) {
+    loadNotes();
   }
 });
 
@@ -245,6 +247,18 @@ function highlightText(text, query) {
   const q = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const re = new RegExp("(" + q + ")", "gi");
   return escaped.replace(re, '<span class="search-hl">$1</span>');
+}
+
+function contentSnippet(content, query) {
+  if (!query || !content) return "";
+  const q = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(q, "i");
+  const idx = content.search(re);
+  if (idx === -1) return "";
+  const start = Math.max(0, idx - 30);
+  const end = Math.min(content.length, idx + query.length + 60);
+  let snippet = (start > 0 ? "…" : "") + content.slice(start, end).replace(/\n/g, " ") + (end < content.length ? "…" : "");
+  return highlightText(snippet, query);
 }
 
 // === Sort ===
@@ -530,9 +544,11 @@ function renderNoteList(notes) {
 
     // Search highlight
     const titleHtml = searchQuery ? highlightText(n.title, searchQuery) : escapeHtml(n.title);
+    const snippetHtml = searchQuery ? contentSnippet(n.content, searchQuery) : "";
 
     li.innerHTML = `
       <span class="note-item-title">${pinIcon}${titleHtml}</span>
+      ${snippetHtml ? '<span class="note-item-snippet">' + snippetHtml + '</span>' : ''}
       <span class="note-item-meta">${escapeHtml(n.language)} &middot; ${date}${nbLabel}</span>
     `;
 

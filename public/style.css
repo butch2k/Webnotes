@@ -357,6 +357,15 @@ body:has(.offline-banner:not(.hidden)) .layout {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+#note-list li .note-item-snippet {
+  display: block;
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 #note-list li .note-item-meta {
   font-size: 11px;
   color: var(--text-muted);

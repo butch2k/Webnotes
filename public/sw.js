@@ -1,4 +1,4 @@
-const CACHE_NAME = "webnotes-v15";
+const CACHE_NAME = "webnotes-v16";
 const STATIC_ASSETS = [
   "/",
   "/index.html",
