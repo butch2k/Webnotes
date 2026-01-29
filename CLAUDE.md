@@ -17,6 +17,8 @@ npm run dev                     # Dev mode with auto-reload (node --watch)
 
 No test suite or linter is configured.
 
+The default branch is `main`. Create feature branches from `main` and PR back into it.
+
 ## Architecture
 
 Webnotes is a note-taking app with syntax highlighting, built with Express.js backend and vanilla JavaScript frontend.
