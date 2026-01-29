@@ -8,8 +8,6 @@ services:
       POSTGRES_DB: webnotes
     volumes:
       - pgdata:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
 
   app:
     build: .

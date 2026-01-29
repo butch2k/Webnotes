@@ -8,6 +8,7 @@ const previewEl = document.getElementById("note-preview");
 const btnNew = document.getElementById("btn-new");
 const btnPreview = document.getElementById("btn-preview");
 const btnDelete = document.getElementById("btn-delete");
+const saveIndicator = document.querySelector(".save-indicator");
 
 let currentNoteId = null;
 let saveTimeout = null;
@@ -20,6 +21,10 @@ async function api(path, opts = {}) {
     ...opts,
   });
   if (res.status === 204) return null;
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || "Request failed");
+  }
   return res.json();
 }
 
@@ -29,15 +34,24 @@ async function loadNotes() {
   noteList.innerHTML = "";
   notes.forEach((n) => {
     const li = document.createElement("li");
+    li.setAttribute("role", "option");
+    li.setAttribute("tabindex", "0");
+    li.setAttribute("aria-selected", n.id === currentNoteId ? "true" : "false");
     if (n.id === currentNoteId) li.classList.add("active");
     const date = new Date(n.updated_at).toLocaleDateString(undefined, {
       month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
     });
     li.innerHTML = `
       <span class="note-item-title">${escapeHtml(n.title)}</span>
-      <span class="note-item-meta">${n.language} &middot; ${date}</span>
+      <span class="note-item-meta">${escapeHtml(n.language)} &middot; ${date}</span>
     `;
     li.onclick = () => openNote(n.id);
+    li.onkeydown = (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        openNote(n.id);
+      }
+    };
     noteList.appendChild(li);
   });
 }
@@ -101,6 +115,7 @@ async function deleteNote() {
 function togglePreview() {
   previewing = !previewing;
   btnPreview.classList.toggle("active", previewing);
+  btnPreview.setAttribute("aria-pressed", previewing);
   contentArea.classList.toggle("hidden", previewing);
   previewEl.classList.toggle("hidden", !previewing);
   if (previewing) updatePreview();
@@ -123,6 +138,7 @@ function showEditor() {
   emptyState.classList.add("hidden");
   previewing = false;
   btnPreview.classList.remove("active");
+  btnPreview.setAttribute("aria-pressed", "false");
   contentArea.classList.remove("hidden");
   previewEl.classList.add("hidden");
 }
@@ -133,15 +149,9 @@ function hideEditor() {
 }
 
 function flashSaved() {
-  let ind = document.querySelector(".save-indicator");
-  if (!ind) {
-    ind = document.createElement("span");
-    ind.className = "save-indicator";
-    ind.textContent = "Saved";
-    document.querySelector(".toolbar").appendChild(ind);
-  }
-  ind.classList.add("show");
-  setTimeout(() => ind.classList.remove("show"), 1500);
+  saveIndicator.textContent = "Saved";
+  saveIndicator.classList.add("show");
+  setTimeout(() => saveIndicator.classList.remove("show"), 1500);
 }
 
 function escapeHtml(s) {

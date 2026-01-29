@@ -4,28 +4,33 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Webnotes</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+  <link rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css"
+    integrity="sha512-rO+olRTkcf304DQBxSWxln8JXCzTHlKnIdnMUwYvQa9/Jd4cQaNkItIUj6Z4nvW1dqQto+QgcbVkADQHcuJA=="
+    crossorigin="anonymous" referrerpolicy="no-referrer">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div class="layout">
     <!-- Sidebar -->
-    <aside class="sidebar">
+    <aside class="sidebar" aria-label="Notes list">
       <div class="sidebar-header">
         <h1>Webnotes</h1>
         <button id="btn-new" title="New note">+ New</button>
       </div>
-      <ul id="note-list"></ul>
+      <ul id="note-list" role="listbox" aria-label="Notes"></ul>
     </aside>
 
     <!-- Editor -->
-    <main class="editor">
+    <main class="editor" aria-label="Note editor">
       <div id="empty-state" class="empty-state">
         <p>Select a note or create a new one</p>
       </div>
       <div id="editor-area" class="hidden">
-        <div class="toolbar">
+        <div class="toolbar" role="toolbar" aria-label="Note toolbar">
+          <label for="note-title" class="sr-only">Note title</label>
           <input id="note-title" type="text" placeholder="Title…">
+          <label for="note-lang" class="sr-only">Syntax language</label>
           <select id="note-lang">
             <option value="plaintext">Plain text</option>
             <option value="javascript">JavaScript</option>
@@ -48,16 +53,21 @@
             <option value="xml">XML</option>
             <option value="markdown">Markdown</option>
           </select>
-          <button id="btn-preview" title="Toggle syntax preview">Preview</button>
+          <button id="btn-preview" title="Toggle syntax preview" aria-pressed="false">Preview</button>
           <button id="btn-delete" title="Delete note">Delete</button>
+          <span class="save-indicator" role="status" aria-live="polite"></span>
         </div>
+        <label for="note-content" class="sr-only">Note content</label>
         <textarea id="note-content" placeholder="Paste or type your text here…" spellcheck="false"></textarea>
-        <pre id="note-preview" class="hidden"><code></code></pre>
+        <pre id="note-preview" class="hidden" aria-label="Syntax highlighted preview"><code></code></pre>
       </div>
     </main>
   </div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script
+    src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"
+    integrity="sha512-D9gUyxqja7hBtkWpPWGt9wfbfaMGVt9gnyCvYa+jojwwPHLCzUm5i8rpk7vO3Y4+dkE2UEHYl7SaOQkliGEg=="
+    crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <script src="app.js"></script>
 </body>
 </html>

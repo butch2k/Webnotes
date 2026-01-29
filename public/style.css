@@ -8,6 +8,19 @@ body {
   overflow: hidden;
 }
 
+/* Screen-reader only utility */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .layout {
   display: flex;
   height: 100vh;
@@ -65,6 +78,11 @@ body {
   flex-direction: column;
 }
 #note-list li:hover { background: #313244; }
+#note-list li:focus-visible {
+  background: #313244;
+  outline: 2px solid #cba6f7;
+  outline-offset: -2px;
+}
 #note-list li.active { background: #45475a; }
 
 #note-list li .note-item-title {
@@ -76,7 +94,7 @@ body {
 }
 #note-list li .note-item-meta {
   font-size: 11px;
-  color: #6c7086;
+  color: #9399b2;
   margin-top: 2px;
 }
 
@@ -93,7 +111,7 @@ body {
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: #6c7086;
+  color: #9399b2;
   font-size: 16px;
 }
 
@@ -116,7 +134,7 @@ body {
   font-size: 14px;
   outline: none;
 }
-#note-title:focus { border-color: #cba6f7; }
+#note-title:focus-visible { border-color: #cba6f7; outline: 1px solid #cba6f7; }
 
 #note-lang {
   background: #313244;
@@ -128,6 +146,7 @@ body {
   outline: none;
   cursor: pointer;
 }
+#note-lang:focus-visible { border-color: #cba6f7; outline: 1px solid #cba6f7; }
 
 #btn-preview, #btn-delete {
   padding: 8px 14px;
@@ -142,6 +161,7 @@ body {
   color: #cdd6f4;
 }
 #btn-preview:hover { background: #585b70; }
+#btn-preview:focus-visible { outline: 2px solid #cba6f7; outline-offset: 2px; }
 #btn-preview.active { background: #cba6f7; color: #1e1e2e; }
 
 #btn-delete {
@@ -149,6 +169,9 @@ body {
   color: #f38ba8;
 }
 #btn-delete:hover { background: #f38ba8; color: #1e1e2e; }
+#btn-delete:focus-visible { outline: 2px solid #f38ba8; outline-offset: 2px; }
+
+#btn-new:focus-visible { outline: 2px solid #cba6f7; outline-offset: 2px; }
 
 #note-content {
   flex: 1;
@@ -163,6 +186,7 @@ body {
   outline: none;
   tab-size: 2;
 }
+#note-content:focus-visible { outline: 2px solid #cba6f7; outline-offset: -2px; }
 
 #note-preview {
   flex: 1;
