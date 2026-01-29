@@ -5,6 +5,7 @@ const titleInput = document.getElementById("note-title");
 const langSelect = document.getElementById("note-lang");
 const contentArea = document.getElementById("note-content");
 const previewEl = document.getElementById("note-preview");
+const mdPreviewEl = document.getElementById("md-preview");
 const btnNew = document.getElementById("btn-new");
 const btnPreview = document.getElementById("btn-preview");
 const btnCopy = document.getElementById("btn-copy");
@@ -549,18 +550,180 @@ function updateStats() {
   statusStats.textContent = `${lines} lines \u00B7 ${words} words \u00B7 ${chars} chars`;
 }
 
+// === Lightweight Markdown renderer ===
+function renderMarkdown(src) {
+  // Sanitize HTML entities first
+  function esc(s) {
+    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  const lines = src.split("\n");
+  const out = [];
+  let i = 0;
+  let inList = false;
+  let listType = "";
+
+  function closeList() {
+    if (inList) {
+      out.push(listType === "ol" ? "</ol>" : "</ul>");
+      inList = false;
+    }
+  }
+
+  function inline(text) {
+    // Images before links
+    text = text.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" style="max-width:100%">');
+    // Links
+    text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" rel="noopener">$1</a>');
+    // Bold + italic
+    text = text.replace(/\*\*\*(.+?)\*\*\*/g, "<strong><em>$1</em></strong>");
+    text = text.replace(/___(.+?)___/g, "<strong><em>$1</em></strong>");
+    // Bold
+    text = text.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+    text = text.replace(/__(.+?)__/g, "<strong>$1</strong>");
+    // Italic
+    text = text.replace(/\*(.+?)\*/g, "<em>$1</em>");
+    text = text.replace(/_(.+?)_/g, "<em>$1</em>");
+    // Strikethrough
+    text = text.replace(/~~(.+?)~~/g, "<del>$1</del>");
+    // Inline code
+    text = text.replace(/`([^`]+)`/g, "<code>$1</code>");
+    return text;
+  }
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    // Fenced code block
+    const fenceMatch = line.match(/^```(\w*)/);
+    if (fenceMatch) {
+      closeList();
+      const lang = fenceMatch[1];
+      const codeLines = [];
+      i++;
+      while (i < lines.length && !lines[i].startsWith("```")) {
+        codeLines.push(esc(lines[i]));
+        i++;
+      }
+      i++; // skip closing ```
+      let codeHtml = codeLines.join("\n");
+      if (lang && typeof hljs !== "undefined") {
+        try {
+          codeHtml = hljs.highlight(codeHtml, { language: lang }).value;
+        } catch { /* ignore unknown language */ }
+      }
+      out.push('<pre><code class="' + (lang ? "language-" + esc(lang) : "") + '">' + codeHtml + "</code></pre>");
+      continue;
+    }
+
+    // Heading
+    const headingMatch = line.match(/^(#{1,6})\s+(.+)/);
+    if (headingMatch) {
+      closeList();
+      const level = headingMatch[1].length;
+      out.push("<h" + level + ">" + inline(esc(headingMatch[2])) + "</h" + level + ">");
+      i++;
+      continue;
+    }
+
+    // Horizontal rule
+    if (/^(-{3,}|\*{3,}|_{3,})\s*$/.test(line)) {
+      closeList();
+      out.push("<hr>");
+      i++;
+      continue;
+    }
+
+    // Blockquote
+    if (line.startsWith("> ")) {
+      closeList();
+      const quoteLines = [];
+      while (i < lines.length && lines[i].startsWith("> ")) {
+        quoteLines.push(lines[i].substring(2));
+        i++;
+      }
+      out.push("<blockquote>" + inline(esc(quoteLines.join("\n"))) + "</blockquote>");
+      continue;
+    }
+
+    // Unordered list
+    const ulMatch = line.match(/^[\-\*\+]\s+(.+)/);
+    if (ulMatch) {
+      if (!inList || listType !== "ul") {
+        closeList();
+        out.push("<ul>");
+        inList = true;
+        listType = "ul";
+      }
+      out.push("<li>" + inline(esc(ulMatch[1])) + "</li>");
+      i++;
+      continue;
+    }
+
+    // Ordered list
+    const olMatch = line.match(/^\d+\.\s+(.+)/);
+    if (olMatch) {
+      if (!inList || listType !== "ol") {
+        closeList();
+        out.push("<ol>");
+        inList = true;
+        listType = "ol";
+      }
+      out.push("<li>" + inline(esc(olMatch[1])) + "</li>");
+      i++;
+      continue;
+    }
+
+    // Empty line
+    if (line.trim() === "") {
+      closeList();
+      i++;
+      continue;
+    }
+
+    // Paragraph
+    closeList();
+    out.push("<p>" + inline(esc(line)) + "</p>");
+    i++;
+  }
+
+  closeList();
+  return out.join("\n");
+}
+
 // === Preview with line numbers ===
+function isMarkdownMode() {
+  return langSelect.value === "markdown";
+}
+
 function togglePreview() {
   previewing = !previewing;
   btnPreview.classList.toggle("active", previewing);
   btnPreview.setAttribute("aria-pressed", String(previewing));
   contentArea.classList.toggle("hidden", previewing);
-  previewEl.classList.toggle("hidden", !previewing);
+  if (isMarkdownMode()) {
+    previewEl.classList.add("hidden");
+    mdPreviewEl.classList.toggle("hidden", !previewing);
+  } else {
+    mdPreviewEl.classList.add("hidden");
+    previewEl.classList.toggle("hidden", !previewing);
+  }
   if (previewing) updatePreview();
 }
 
 function updatePreview() {
   if (!previewing) return;
+
+  if (isMarkdownMode()) {
+    previewEl.classList.add("hidden");
+    mdPreviewEl.classList.remove("hidden");
+    mdPreviewEl.innerHTML = renderMarkdown(contentArea.value);
+    return;
+  }
+
+  mdPreviewEl.classList.add("hidden");
+  previewEl.classList.remove("hidden");
+
   const code = previewEl.querySelector("code");
   code.textContent = contentArea.value;
   code.className = "";
@@ -665,6 +828,7 @@ function showEditor() {
   btnPreview.setAttribute("aria-pressed", "false");
   contentArea.classList.remove("hidden");
   previewEl.classList.add("hidden");
+  mdPreviewEl.classList.add("hidden");
 }
 
 function hideEditor() {
