@@ -36,7 +36,18 @@ function load() {
   }
 }
 
+let saveTimer = null;
+
 function save() {
+  // Debounce writes: flush at most once per 500ms
+  if (saveTimer) return;
+  saveTimer = setTimeout(() => {
+    saveTimer = null;
+    saveSync();
+  }, 500);
+}
+
+function saveSync() {
   const tmp = DB_FILE + ".tmp";
   fs.writeFileSync(tmp, JSON.stringify({ notes, nextId, versions }, null, 2));
   fs.renameSync(tmp, DB_FILE);

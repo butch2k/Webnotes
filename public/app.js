@@ -97,14 +97,26 @@ function getPendingQueue() {
   catch { return []; }
 }
 function setPendingQueue(q) {
-  localStorage.setItem(QUEUE_KEY, JSON.stringify(q));
+  try {
+    localStorage.setItem(QUEUE_KEY, JSON.stringify(q));
+  } catch (err) {
+    if (err.name === "QuotaExceededError") {
+      console.warn("localStorage quota exceeded for pending queue");
+    }
+  }
 }
 function getCachedNotes() {
   try { return JSON.parse(localStorage.getItem(CACHE_KEY)) || []; }
   catch { return []; }
 }
 function setCachedNotes(notes) {
-  localStorage.setItem(CACHE_KEY, JSON.stringify(notes));
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify(notes));
+  } catch (err) {
+    if (err.name === "QuotaExceededError") {
+      console.warn("localStorage quota exceeded for cached notes");
+    }
+  }
 }
 
 function enqueue(entry) {
@@ -237,8 +249,11 @@ async function serverSearch() {
       lastNotes = notes;
       renderNoteList(notes);
     }
-  } catch {
-    // Fall back to local filter
+  } catch (err) {
+    if (!(err instanceof TypeError)) {
+      console.error("Search failed:", err);
+      flashSaved("Search error");
+    }
   }
 }
 
@@ -341,7 +356,8 @@ function showTagContextMenu(e, tagName) {
   renameBtn.textContent = "Rename";
   renameBtn.onclick = () => {
     closeTagContextMenu();
-    const newName = prompt("Rename tag \"" + tagName + "\" to:", tagName);
+    const safeTagName = tagName.replace(/[^\w\s\-]/g, "");
+    const newName = prompt("Rename tag \"" + safeTagName + "\" to:", tagName);
     if (newName && newName.trim() && newName.trim() !== tagName) {
       api("/tags/" + encodeURIComponent(tagName), {
         method: "PUT",
@@ -363,7 +379,8 @@ function showTagContextMenu(e, tagName) {
   deleteBtn.textContent = "Delete tag";
   deleteBtn.onclick = () => {
     closeTagContextMenu();
-    if (!confirm("Delete tag \"" + tagName + "\"? It will be removed from all notes.")) return;
+    const safeTagName2 = tagName.replace(/[^\w\s\-]/g, "");
+    if (!confirm("Delete tag \"" + safeTagName2 + "\"? It will be removed from all notes.")) return;
     api("/tags/" + encodeURIComponent(tagName), { method: "DELETE" }).then(() => {
       if (currentFilterTag === tagName) currentFilterTag = null;
       // Update current note tags if open
@@ -1031,17 +1048,17 @@ function renderMarkdown(src) {
   }
 
   function inline(text) {
-    // Sanitize URLs — only allow http(s) and relative paths
+    // Sanitize URLs — allowlist: only http(s) and relative paths
     function safeUrl(url) {
       const decoded = url.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').trim();
       if (/^https?:\/\//i.test(decoded)) return url;
-      if (/^[a-zA-Z][a-zA-Z0-9+\-.]*:/i.test(decoded)) return "";
       if (/^[/#.]/.test(decoded)) return url;
-      return "";
+      // Block everything else (javascript:, data:, vbscript:, etc.)
+      return null;
     }
     text = text.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, url) => {
       const safe = safeUrl(url);
-      return safe ? '<img src="' + safe + '" alt="' + alt + '" style="max-width:100%">' : alt;
+      return safe ? '<img src="' + safe + '" alt="' + esc(alt) + '" style="max-width:100%">' : esc(alt);
     });
     text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, url) => {
       const safe = safeUrl(url);
@@ -1183,7 +1200,15 @@ function updatePreview() {
   if (isMarkdownMode()) {
     previewEl.classList.add("hidden");
     mdPreviewEl.classList.remove("hidden");
-    mdPreviewEl.innerHTML = renderMarkdown(contentArea.value);
+    const rendered = renderMarkdown(contentArea.value);
+    mdPreviewEl.innerHTML = rendered;
+    // Strip any script/event handler injection from rendered HTML
+    mdPreviewEl.querySelectorAll("script").forEach((el) => el.remove());
+    mdPreviewEl.querySelectorAll("*").forEach((el) => {
+      for (const attr of [...el.attributes]) {
+        if (attr.name.startsWith("on")) el.removeAttribute(attr.name);
+      }
+    });
     return;
   }
 
@@ -1245,6 +1270,7 @@ async function openVersionHistory() {
   }
   currentVersions.forEach((v, idx) => {
     const li = document.createElement("li");
+    li.setAttribute("tabindex", "0");
     const date = new Date(v.saved_at).toLocaleDateString(undefined, {
       month: "short", day: "numeric", year: "numeric",
       hour: "2-digit", minute: "2-digit", second: "2-digit",
@@ -1252,8 +1278,12 @@ async function openVersionHistory() {
     li.innerHTML = '<div class="ver-date">' + escapeHtml(date) + '</div>' +
       '<div class="ver-preview">' + escapeHtml((v.content || "").substring(0, 100)) + '</div>';
     li.onclick = () => showVersionDiff(idx);
+    li.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); showVersionDiff(idx); } };
     versionListEl.appendChild(li);
   });
+  // Focus first version item
+  const firstItem = versionListEl.querySelector("li[tabindex]");
+  if (firstItem) firstItem.focus();
 }
 
 function showVersionDiff(idx) {
@@ -1445,11 +1475,12 @@ resizeHandle.addEventListener("mousedown", (e) => {
   document.addEventListener("mouseup", onUp);
 });
 
-// Handle tab key in textarea (Escape releases the tab trap)
+// Handle tab key in textarea (Escape releases the tab trap, re-enabled on focus)
 let tabTrapped = true;
 contentArea.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     tabTrapped = false;
+    flashSaved("Tab key released");
     return;
   }
   if (e.key === "Tab" && tabTrapped) {
@@ -1463,6 +1494,7 @@ contentArea.addEventListener("keydown", (e) => {
   }
 });
 contentArea.addEventListener("focus", () => { tabTrapped = true; });
+contentArea.addEventListener("blur", () => { tabTrapped = true; });
 
 // === Find in note ===
 const findBar = document.getElementById("find-bar");

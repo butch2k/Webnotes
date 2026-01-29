@@ -1,6 +1,7 @@
 require("dotenv").config();
 const express = require("express");
 const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
 const path = require("path");
 
 const app = express();
@@ -14,14 +15,27 @@ app.use(
         scriptSrc: ["'self'", "https://cdnjs.cloudflare.com", "'sha256-SNGGNs0Fj0qx1hYYbbNwH+xI7xjt+v10rkTxVCQ4Grw='", "'sha256-Nny8H/je5llKyTsleHxYL8feCRalb8GOIQ20BMZf8DE='", "'sha256-qnbl7ughnhiwU+erhELQjfSnGqj3thjsxYq9/zMMZXo='"],
         workerSrc: ["'self'"],
         imgSrc: ["'self'", "https:", "data:"],
-        styleSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],
+        styleSrc: ["'self'", "https://cdnjs.cloudflare.com"],
       },
     },
   })
 );
 
+// Rate limiting
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 300,
+  message: { error: "Too many requests, please try again later" },
+});
+const bulkLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  message: { error: "Too many bulk requests, please try again later" },
+});
+
 app.use(express.json({ limit: "5mb" }));
 app.use(express.static(path.join(__dirname, "public")));
+app.use("/api/", apiLimiter);
 
 function validateNote(req, res, next) {
   const { title, content, language } = req.body;
@@ -43,10 +57,18 @@ function validateNote(req, res, next) {
   if (tags !== undefined) {
     if (!Array.isArray(tags))
       return res.status(400).json({ error: "tags must be an array" });
-    if (tags.some((t) => typeof t !== "string" || t.length > 100))
-      return res.status(400).json({ error: "each tag must be a string (max 100)" });
     if (tags.length > 20)
       return res.status(400).json({ error: "too many tags (max 20)" });
+    const seen = new Set();
+    for (const t of tags) {
+      if (typeof t !== "string" || t.length === 0 || t.length > 100)
+        return res.status(400).json({ error: "each tag must be a non-empty string (max 100)" });
+      if (t.trim() !== t)
+        return res.status(400).json({ error: "tags cannot have leading/trailing whitespace" });
+      if (seen.has(t))
+        return res.status(400).json({ error: "duplicate tags not allowed" });
+      seen.add(t);
+    }
   }
   next();
 }
@@ -118,7 +140,7 @@ app.get("/api/notes", async (req, res, next) => {
 });
 
 // Bulk operations
-app.post("/api/notes/bulk", async (req, res, next) => {
+app.post("/api/notes/bulk", bulkLimiter, async (req, res, next) => {
   try {
     const { action, ids, tag } = req.body;
     if (!Array.isArray(ids) || !ids.length) {
