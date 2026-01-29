@@ -12,7 +12,7 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "https://cdnjs.cloudflare.com", "'sha256-cjRA/q6pJQvfN+9LVdnggzVPLAqVDMjFLVgcWIVfvsM='"],
+        scriptSrc: ["'self'", "https://cdnjs.cloudflare.com", "'sha256-rK+Mx+8ZfQh6wMaytxOiKWAGb/f1Z9xO2jXMaczp21Q='"],
         styleSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],
       },
     },
