@@ -3,7 +3,7 @@ const editorArea = document.getElementById("editor-area");
 const emptyState = document.getElementById("empty-state");
 const titleInput = document.getElementById("note-title");
 const langSelect = document.getElementById("note-lang");
-const contentArea = document.getElementById("note-content");
+const contentAreaContainer = document.getElementById("note-content-cm");
 const previewEl = document.getElementById("note-preview");
 const mdPreviewEl = document.getElementById("md-preview");
 const btnNew = document.getElementById("btn-new");
@@ -80,6 +80,11 @@ function setTheme(theme) {
 
   themeIcon.textContent = theme === "dark" ? "\u2600" : "\u263E";
   btnTheme.setAttribute("aria-label", theme === "dark" ? "Switch to light theme" : "Switch to dark theme");
+
+  // Update CodeMirror theme
+  if (window.EditorBridge) {
+    window.EditorBridge.setTheme(theme === "dark");
+  }
 
   if (previewing) updatePreview();
 }
@@ -720,7 +725,8 @@ async function openNote(id) {
     currentNoteTags = Array.isArray(note.tags) ? [...note.tags] : [];
     titleInput.value = note.title;
     langSelect.value = note.language;
-    contentArea.value = note.content;
+    window.EditorBridge.setValue(note.content);
+    window.EditorBridge.setLanguage(note.language);
     renderCurrentTags();
     showEditor();
     updatePinButton();
@@ -738,7 +744,8 @@ async function openNote(id) {
       currentNoteTags = Array.isArray(cached.tags) ? [...cached.tags] : [];
       titleInput.value = cached.title;
       langSelect.value = cached.language || "plaintext";
-      contentArea.value = cached.content || "";
+      window.EditorBridge.setValue(cached.content || "");
+      window.EditorBridge.setLanguage(cached.language || "plaintext");
       renderCurrentTags();
       showEditor();
       updatePinButton();
@@ -764,7 +771,8 @@ async function createNote() {
     currentNoteTags = Array.isArray(note.tags) ? [...note.tags] : [];
     titleInput.value = note.title;
     langSelect.value = note.language;
-    contentArea.value = note.content;
+    window.EditorBridge.setValue(note.content);
+    window.EditorBridge.setLanguage(note.language);
     renderCurrentTags();
     showEditor();
     updatePinButton();
@@ -800,7 +808,8 @@ async function createNote() {
     currentNoteTags = [...tags];
     titleInput.value = tempNote.title;
     langSelect.value = tempNote.language;
-    contentArea.value = tempNote.content;
+    window.EditorBridge.setValue(tempNote.content);
+    window.EditorBridge.setLanguage(tempNote.language);
     renderCurrentTags();
     showEditor();
     updatePinButton();
@@ -828,7 +837,8 @@ async function createNoteFromFile(filename, content, language) {
     currentNoteTags = Array.isArray(note.tags) ? [...note.tags] : [];
     titleInput.value = note.title;
     langSelect.value = note.language;
-    contentArea.value = note.content;
+    window.EditorBridge.setValue(note.content);
+    window.EditorBridge.setLanguage(note.language);
     renderCurrentTags();
     showEditor();
     updatePinButton();
@@ -862,7 +872,8 @@ async function createNoteFromFile(filename, content, language) {
     currentNoteTags = [...tags];
     titleInput.value = tempNote.title;
     langSelect.value = tempNote.language;
-    contentArea.value = tempNote.content;
+    window.EditorBridge.setValue(tempNote.content);
+    window.EditorBridge.setLanguage(tempNote.language);
     renderCurrentTags();
     showEditor();
     updatePinButton();
@@ -884,7 +895,7 @@ async function saveNote() {
   if (!currentNoteId) return;
   const data = {
     title: titleInput.value || "Untitled",
-    content: contentArea.value,
+    content: window.EditorBridge.getValue(),
     language: langSelect.value,
     tags: currentNoteTags,
   };
@@ -964,14 +975,13 @@ async function deleteNote() {
 
 // === Copy to clipboard ===
 async function copyToClipboard() {
-  if (!contentArea.value) return;
+  const content = window.EditorBridge.getValue();
+  if (!content) return;
   try {
-    await navigator.clipboard.writeText(contentArea.value);
+    await navigator.clipboard.writeText(content);
     flashSaved("Copied!");
   } catch {
-    contentArea.select();
-    document.execCommand("copy");
-    flashSaved("Copied!");
+    flashSaved("Copy failed");
   }
 }
 
@@ -986,12 +996,13 @@ const LANG_TO_EXT = {
 };
 
 function exportNote() {
-  if (!currentNoteId || !contentArea.value) return;
+  const content = window.EditorBridge.getValue();
+  if (!currentNoteId || !content) return;
   const lang = langSelect.value === "auto" ? "plaintext" : langSelect.value;
   const ext = LANG_TO_EXT[lang] || "txt";
   const title = titleInput.value || "Untitled";
   const filename = lang === "dockerfile" ? "Dockerfile" : title.replace(/[^a-zA-Z0-9_\-. ]/g, "_") + "." + ext;
-  const blob = new Blob([contentArea.value], { type: "text/plain;charset=utf-8" });
+  const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -1003,7 +1014,7 @@ function exportNote() {
 
 // === Word / char / line count + timestamps ===
 function updateStats() {
-  const text = contentArea.value;
+  const text = window.EditorBridge.getValue();
   const chars = text.length;
   const lines = text ? text.split("\n").length : 0;
   const words = text.trim() ? text.trim().split(/\s+/).length : 0;
@@ -1183,7 +1194,7 @@ function togglePreview() {
   previewing = !previewing;
   btnPreview.classList.toggle("active", previewing);
   btnPreview.setAttribute("aria-pressed", String(previewing));
-  contentArea.classList.toggle("hidden", previewing);
+  contentAreaContainer.classList.toggle("hidden", previewing);
   if (isMarkdownMode()) {
     previewEl.classList.add("hidden");
     mdPreviewEl.classList.toggle("hidden", !previewing);
@@ -1197,10 +1208,12 @@ function togglePreview() {
 function updatePreview() {
   if (!previewing) return;
 
+  const content = window.EditorBridge.getValue();
+
   if (isMarkdownMode()) {
     previewEl.classList.add("hidden");
     mdPreviewEl.classList.remove("hidden");
-    const rendered = renderMarkdown(contentArea.value);
+    const rendered = renderMarkdown(content);
     mdPreviewEl.innerHTML = rendered;
     // Strip any script/event handler injection from rendered HTML
     mdPreviewEl.querySelectorAll("script").forEach((el) => el.remove());
@@ -1216,18 +1229,18 @@ function updatePreview() {
   previewEl.classList.remove("hidden");
 
   const code = previewEl.querySelector("code");
-  code.textContent = contentArea.value;
+  code.textContent = content;
   code.className = "";
   previewEl.classList.remove("line-numbers");
 
   const lang = langSelect.value;
   if (typeof hljs !== "undefined") {
     if (lang === "auto") {
-      const result = hljs.highlightAuto(contentArea.value);
+      const result = hljs.highlightAuto(content);
       code.innerHTML = result.value;
     } else if (lang !== "plaintext" && hljs.getLanguage(lang)) {
       code.classList.add("language-" + lang);
-      code.innerHTML = hljs.highlight(contentArea.value, { language: lang }).value;
+      code.innerHTML = hljs.highlight(content, { language: lang }).value;
     }
   }
 
@@ -1254,7 +1267,7 @@ async function openVersionHistory() {
     currentVersions = [];
   }
   versionPanel.classList.remove("hidden");
-  contentArea.classList.add("hidden");
+  contentAreaContainer.classList.add("hidden");
   previewEl.classList.add("hidden");
   mdPreviewEl.classList.add("hidden");
   versionDiff.classList.add("hidden");
@@ -1309,16 +1322,19 @@ function closeVersionHistory() {
       previewEl.classList.remove("hidden");
     }
   } else {
-    contentArea.classList.remove("hidden");
+    contentAreaContainer.classList.remove("hidden");
   }
 }
 
 function restoreVersion() {
   if (selectedVersionIdx < 0 || selectedVersionIdx >= currentVersions.length) return;
   const v = currentVersions[selectedVersionIdx];
-  contentArea.value = v.content;
+  window.EditorBridge.setValue(v.content);
   if (v.title) titleInput.value = v.title;
-  if (v.language) langSelect.value = v.language;
+  if (v.language) {
+    langSelect.value = v.language;
+    window.EditorBridge.setLanguage(v.language);
+  }
   closeVersionHistory();
   scheduleSave();
   updateStats();
@@ -1408,7 +1424,7 @@ function showEditor() {
   previewing = false;
   btnPreview.classList.remove("active");
   btnPreview.setAttribute("aria-pressed", "false");
-  contentArea.classList.remove("hidden");
+  contentAreaContainer.classList.remove("hidden");
   previewEl.classList.add("hidden");
   mdPreviewEl.classList.add("hidden");
   versionPanel.classList.add("hidden");
@@ -1475,137 +1491,14 @@ resizeHandle.addEventListener("mousedown", (e) => {
   document.addEventListener("mouseup", onUp);
 });
 
-// Handle tab key in textarea (Escape releases the tab trap, re-enabled on focus)
-let tabTrapped = true;
-contentArea.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") {
-    tabTrapped = false;
-    flashSaved("Tab key released");
-    return;
-  }
-  if (e.key === "Tab" && tabTrapped) {
-    e.preventDefault();
-    const start = contentArea.selectionStart;
-    const end = contentArea.selectionEnd;
-    contentArea.value =
-      contentArea.value.substring(0, start) + "  " + contentArea.value.substring(end);
-    contentArea.selectionStart = contentArea.selectionEnd = start + 2;
-    scheduleSave();
-  }
-});
-contentArea.addEventListener("focus", () => { tabTrapped = true; });
-contentArea.addEventListener("blur", () => { tabTrapped = true; });
 
-// === Find in note ===
-const findBar = document.getElementById("find-bar");
-const findInput = document.getElementById("find-input");
-const findCount = document.getElementById("find-count");
-let findMatches = [];
-let findIdx = -1;
-
-function openFindBar() {
-  findBar.classList.remove("hidden");
-  findInput.focus();
-  const sel = contentArea.value.substring(contentArea.selectionStart, contentArea.selectionEnd);
-  if (sel && sel.length < 200) {
-    findInput.value = sel;
-  }
-  findInput.select();
-  runFind();
-}
-
-function closeFindBar() {
-  findBar.classList.add("hidden");
-  findMatches = [];
-  findIdx = -1;
-  findCount.textContent = "";
-  contentArea.focus();
-}
-
-function runFind() {
-  const q = findInput.value;
-  findMatches = [];
-  findIdx = -1;
-  if (!q) {
-    findCount.textContent = "";
-    return;
-  }
-  const text = contentArea.value.toLowerCase();
-  const ql = q.toLowerCase();
-  let pos = 0;
-  while ((pos = text.indexOf(ql, pos)) !== -1) {
-    findMatches.push(pos);
-    pos += ql.length;
-  }
-  if (findMatches.length) {
-    findIdx = 0;
-    // Jump to nearest match from cursor
-    const cursor = contentArea.selectionStart;
-    for (let i = 0; i < findMatches.length; i++) {
-      if (findMatches[i] >= cursor) { findIdx = i; break; }
-    }
-    selectMatch();
-  }
-  updateFindCount();
-}
-
-function selectMatch() {
-  if (findIdx < 0 || !findMatches.length) return;
-  const pos = findMatches[findIdx];
-  contentArea.focus();
-  contentArea.setSelectionRange(pos, pos + findInput.value.length);
-  // Scroll textarea to selection — set cursor briefly to scroll, then restore selection
-  const len = findInput.value.length;
-  contentArea.blur();
-  contentArea.setSelectionRange(pos, pos + len);
-  contentArea.focus();
-}
-
-function updateFindCount() {
-  if (!findMatches.length && findInput.value) {
-    findCount.textContent = "No results";
-  } else if (findMatches.length) {
-    findCount.textContent = (findIdx + 1) + " of " + findMatches.length;
-  } else {
-    findCount.textContent = "";
-  }
-}
-
-function findNext() {
-  if (!findMatches.length) return;
-  findIdx = (findIdx + 1) % findMatches.length;
-  selectMatch();
-  updateFindCount();
-}
-
-function findPrev() {
-  if (!findMatches.length) return;
-  findIdx = (findIdx - 1 + findMatches.length) % findMatches.length;
-  selectMatch();
-  updateFindCount();
-}
-
-findInput.addEventListener("input", runFind);
-findInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") {
-    e.preventDefault();
-    if (e.shiftKey) findPrev(); else findNext();
-  }
-  if (e.key === "Escape") {
-    e.preventDefault();
-    closeFindBar();
-  }
-});
-document.getElementById("find-next").addEventListener("click", findNext);
-document.getElementById("find-prev").addEventListener("click", findPrev);
-document.getElementById("find-close").addEventListener("click", closeFindBar);
 
 // === Keyboard shortcuts ===
 document.addEventListener("keydown", (e) => {
-  // Ctrl+F opens find bar when a note is open
+  // Ctrl+F opens CodeMirror search when a note is open
   if ((e.ctrlKey || e.metaKey) && e.key === "f" && currentNoteId && !editorArea.classList.contains("hidden")) {
     e.preventDefault();
-    openFindBar();
+    window.EditorBridge.openSearch();
     return;
   }
 
@@ -1621,9 +1514,6 @@ document.addEventListener("keydown", (e) => {
         range.selectNodeContents(target);
         sel.removeAllRanges();
         sel.addRange(range);
-      } else {
-        contentArea.focus();
-        contentArea.select();
       }
       return;
     }
@@ -1655,10 +1545,6 @@ document.addEventListener("keydown", (e) => {
   }
 
   if (e.key === "Escape") {
-    if (!findBar.classList.contains("hidden")) {
-      closeFindBar();
-      return;
-    }
     if (!versionPanel.classList.contains("hidden")) {
       const diffView = document.getElementById("version-diff");
       if (!diffView.classList.contains("hidden")) {
@@ -1725,11 +1611,15 @@ btnExport.addEventListener("click", exportNote);
 btnPin.addEventListener("click", togglePin);
 btnTheme.addEventListener("click", toggleTheme);
 titleInput.addEventListener("input", scheduleSave);
-contentArea.addEventListener("input", () => {
+
+// Setup editor update callback
+window.EditorBridge.onUpdate(() => {
   scheduleSave();
   updateStats();
 });
+
 langSelect.addEventListener("change", () => {
+  window.EditorBridge.setLanguage(langSelect.value);
   scheduleSave();
   updatePreview();
 });
@@ -1785,4 +1675,7 @@ loadNotes();
 loadTags();
 flushQueue();
 setupDragDrop(dropZone);
-setupDragDrop(contentArea);
+setupDragDrop(contentAreaContainer);
+
+// Initialize CodeMirror editor
+window.EditorBridge.init(contentAreaContainer, "", getTheme() === "dark");
