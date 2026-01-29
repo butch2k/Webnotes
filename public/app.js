@@ -378,6 +378,7 @@ async function openNote(id) {
     showEditor();
     updatePinButton();
     updateStats();
+    if (note.content) togglePreview();
     loadNotes();
   } catch {
     const cached = getCachedNotes().find((n) => n.id === id);
@@ -391,6 +392,7 @@ async function openNote(id) {
       showEditor();
       updatePinButton();
       updateStats();
+      if (cached.content) togglePreview();
       renderNoteList(getCachedNotes());
     }
   }
@@ -696,14 +698,15 @@ function renderMarkdown(src) {
       const codeLines = [];
       i++;
       while (i < lines.length && !lines[i].startsWith("```")) {
-        codeLines.push(esc(lines[i]));
+        codeLines.push(lines[i]);
         i++;
       }
       i++; // skip closing ```
-      let codeHtml = codeLines.join("\n");
+      const codeRaw = codeLines.join("\n");
+      let codeHtml = esc(codeRaw);
       if (lang && typeof hljs !== "undefined") {
         try {
-          codeHtml = hljs.highlight(codeHtml, { language: lang }).value;
+          codeHtml = hljs.highlight(codeRaw, { language: lang }).value;
         } catch { /* ignore unknown language */ }
       }
       out.push('<pre><code class="' + (lang ? "language-" + esc(lang) : "") + '">' + codeHtml + "</code></pre>");
