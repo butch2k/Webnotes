@@ -83,3 +83,33 @@ The app runs at `http://localhost:3000`. The database table and full-text search
 | `WEBNOTES_DATA_DIR` | `./data` | Directory for file-based storage |
 
 If none of `PGHOST`, `PGDATABASE`, or `PGUSER` are set, the app uses file-based JSON storage instead of PostgreSQL. If PostgreSQL is configured but unreachable, it also falls back to file storage automatically.
+
+## Security notes
+
+- Notes are stored in plain text (no encryption at rest)
+- Use HTTPS in production via a reverse proxy (e.g. nginx, Caddy)
+- Change default PostgreSQL credentials for production deployments
+- API endpoints are rate-limited to prevent abuse
+
+## Browser support
+
+- Chrome / Edge 88+
+- Firefox 87+
+- Safari 14+
+- Service Worker required for offline mode
+
+## Limitations
+
+- Markdown preview is a lightweight renderer and does not support full CommonMark
+- Full-text search with ranking only works with the PostgreSQL backend; file storage uses substring matching
+- File uploads are limited to 5 MB text files
+
+## Backup
+
+```bash
+# PostgreSQL
+pg_dump -h localhost -U postgres webnotes > backup.sql
+
+# File-based storage
+cp -r data/ data.backup/
+```

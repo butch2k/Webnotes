@@ -236,20 +236,28 @@ async function deleteTag(name) {
 
 async function bulkDelete(ids) {
   if (!ids.length) return 0;
-  const placeholders = ids.map((_, i) => `$${i + 1}`).join(",");
+  const numericIds = ids.map(Number);
+  if (numericIds.some((id) => !Number.isFinite(id) || id <= 0)) {
+    throw new Error("Invalid id format");
+  }
+  const placeholders = numericIds.map((_, i) => `$${i + 1}`).join(",");
   const { rowCount } = await pool.query(
     `DELETE FROM notes WHERE id IN (${placeholders})`,
-    ids.map(Number)
+    numericIds
   );
   return rowCount;
 }
 
 async function bulkTag(ids, tag) {
   if (!ids.length) return 0;
-  const placeholders = ids.map((_, i) => `$${i + 2}`).join(",");
+  const numericIds = ids.map(Number);
+  if (numericIds.some((id) => !Number.isFinite(id) || id <= 0)) {
+    throw new Error("Invalid id format");
+  }
+  const placeholders = numericIds.map((_, i) => `$${i + 2}`).join(",");
   const { rowCount } = await pool.query(
     `UPDATE notes SET tags = CASE WHEN NOT ($1 = ANY(tags)) THEN array_append(tags, $1) ELSE tags END, updated_at = NOW() WHERE id IN (${placeholders})`,
-    [tag, ...ids.map(Number)]
+    [tag, ...numericIds]
   );
   return rowCount;
 }
