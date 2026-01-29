@@ -47,6 +47,7 @@ let currentFilterTag = null; // null = all, "" = untagged, "name" = specific tag
 let saveTimeout = null;
 let searchTimeout = null;
 let dirty = false;
+let saving = false;
 let previewing = false;
 let online = navigator.onLine;
 let searchQuery = "";
@@ -172,7 +173,8 @@ async function flushQueue() {
         }
         q.shift();
         setPendingQueue(q);
-      } catch {
+      } catch (err) {
+        console.warn("Queue flush error:", err);
         break;
       }
     }
@@ -336,6 +338,7 @@ function renderTagBar() {
     btn.className = "nb-tab nb-tab-dynamic";
     btn.textContent = t.tag + " (" + t.count + ")";
     btn.setAttribute("aria-pressed", currentFilterTag === t.tag ? "true" : "false");
+    btn.setAttribute("aria-label", "Filter by tag: " + t.tag + " (" + t.count + ")");
     if (currentFilterTag === t.tag) btn.classList.add("active");
     btn.onclick = () => selectFilterTag(t.tag);
     btn.oncontextmenu = (e) => showTagContextMenu(e, t.tag);
@@ -355,10 +358,12 @@ function showTagContextMenu(e, tagName) {
   closeTagContextMenu();
   const menu = document.createElement("div");
   menu.className = "nb-ctx-menu";
+  menu.setAttribute("role", "menu");
   menu.style.left = e.clientX + "px";
   menu.style.top = e.clientY + "px";
 
   const renameBtn = document.createElement("button");
+  renameBtn.setAttribute("role", "menuitem");
   renameBtn.textContent = "Rename";
   renameBtn.onclick = () => {
     closeTagContextMenu();
@@ -382,6 +387,7 @@ function showTagContextMenu(e, tagName) {
 
   const deleteBtn = document.createElement("button");
   deleteBtn.className = "danger";
+  deleteBtn.setAttribute("role", "menuitem");
   deleteBtn.textContent = "Delete tag";
   deleteBtn.onclick = () => {
     closeTagContextMenu();
@@ -400,6 +406,14 @@ function showTagContextMenu(e, tagName) {
   menu.appendChild(renameBtn);
   menu.appendChild(deleteBtn);
   document.body.appendChild(menu);
+  menu.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { e.preventDefault(); closeTagContextMenu(); return; }
+    const items = menu.querySelectorAll('[role="menuitem"]');
+    const idx = Array.from(items).indexOf(document.activeElement);
+    if (e.key === "ArrowDown") { e.preventDefault(); items[(idx + 1) % items.length].focus(); }
+    if (e.key === "ArrowUp") { e.preventDefault(); items[(idx - 1 + items.length) % items.length].focus(); }
+  });
+  renameBtn.focus();
 
   // Close on click outside
   setTimeout(() => {
@@ -455,7 +469,8 @@ function renderCurrentTags() {
     const removeBtn = document.createElement("button");
     removeBtn.className = "tag-chip-remove";
     removeBtn.textContent = "\u00D7";
-    removeBtn.title = "Remove tag";
+    removeBtn.title = "Remove tag " + tag;
+    removeBtn.setAttribute("aria-label", "Remove tag " + tag);
     removeBtn.addEventListener("click", () => removeTag(tag));
     chip.appendChild(removeBtn);
     tagChipsEl.appendChild(chip);
@@ -481,7 +496,7 @@ function saveTagsToNote() {
   dirty = true;
   clearTimeout(saveTimeout);
   saveTimeout = setTimeout(() => {
-    saveNote().then(() => loadTags());
+    saveNote().then(() => loadTags()).catch((err) => console.warn("Tag save error:", err));
   }, 600);
 }
 
@@ -609,6 +624,7 @@ function renderNoteList(notes) {
     li.setAttribute("role", "option");
     li.setAttribute("tabindex", "0");
     li.setAttribute("aria-selected", n.id === currentNoteId ? "true" : "false");
+    li.setAttribute("aria-label", (n.pinned ? "Pinned: " : "") + n.title);
     if (n.id === currentNoteId) li.classList.add("active");
     const date = new Date(n.updated_at).toLocaleDateString(undefined, {
       month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
@@ -634,7 +650,7 @@ function renderNoteList(notes) {
       const unfile = document.createElement("button");
       unfile.className = "btn-unfile";
       unfile.title = "Remove tag \"" + currentFilterTag + "\"";
-      unfile.setAttribute("aria-label", "Remove tag");
+      unfile.setAttribute("aria-label", "Remove tag " + currentFilterTag + " from " + n.title);
       unfile.textContent = "\u00D7";
       unfile.addEventListener("click", async (e) => {
         e.stopPropagation();
@@ -662,6 +678,7 @@ function renderNoteList(notes) {
       cb.type = "checkbox";
       cb.className = "bulk-cb";
       cb.checked = selectedIds.has(n.id);
+      cb.setAttribute("aria-label", "Select " + n.title);
       cb.addEventListener("change", (e) => {
         e.stopPropagation();
         toggleBulkSelect(n.id);
@@ -898,43 +915,49 @@ function scheduleSave() {
 
 async function saveNote() {
   if (!currentNoteId) return;
-  const data = {
-    title: titleInput.value || "Untitled",
-    content: window.EditorBridge.getValue(),
-    language: langSelect.value,
-    tags: currentNoteTags,
-  };
+  if (saving) return;
+  saving = true;
   try {
-    const note = await api("/notes/" + currentNoteId, {
-      method: "PUT",
-      body: JSON.stringify(data),
-    });
-    dirty = false;
-    if (note) {
-      currentNoteUpdatedAt = note.updated_at;
+    const data = {
+      title: titleInput.value || "Untitled",
+      content: window.EditorBridge.getValue(),
+      language: langSelect.value,
+      tags: currentNoteTags,
+    };
+    try {
+      const note = await api("/notes/" + currentNoteId, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      });
+      dirty = false;
+      if (note) {
+        currentNoteUpdatedAt = note.updated_at;
+        updateTimestamps();
+      }
+      flashSaved();
+      // Update lastNotes in place and re-render without full reload
+      const idx = lastNotes.findIndex((n) => n.id === currentNoteId);
+      if (idx !== -1) {
+        Object.assign(lastNotes[idx], data, { updated_at: note ? note.updated_at : lastNotes[idx].updated_at });
+      }
+      renderNoteList(lastNotes);
+    } catch {
+      enqueue({ type: "save", noteId: currentNoteId, data });
+      const cached = getCachedNotes();
+      const idx = cached.findIndex((n) => n.id === currentNoteId);
+      if (idx !== -1) {
+        Object.assign(cached[idx], data, { updated_at: new Date().toISOString() });
+        setCachedNotes(cached);
+      }
+      dirty = false;
+      currentNoteUpdatedAt = new Date().toISOString();
       updateTimestamps();
+      flashSaved("Saved locally");
+      lastNotes = getCachedNotes();
+      renderNoteList(lastNotes);
     }
-    flashSaved();
-    // Update lastNotes in place and re-render without full reload
-    const idx = lastNotes.findIndex((n) => n.id === currentNoteId);
-    if (idx !== -1) {
-      Object.assign(lastNotes[idx], data, { updated_at: note ? note.updated_at : lastNotes[idx].updated_at });
-    }
-    renderNoteList(lastNotes);
-  } catch {
-    enqueue({ type: "save", noteId: currentNoteId, data });
-    const cached = getCachedNotes();
-    const idx = cached.findIndex((n) => n.id === currentNoteId);
-    if (idx !== -1) {
-      Object.assign(cached[idx], data, { updated_at: new Date().toISOString() });
-      setCachedNotes(cached);
-    }
-    dirty = false;
-    currentNoteUpdatedAt = new Date().toISOString();
-    updateTimestamps();
-    flashSaved("Saved locally");
-    lastNotes = getCachedNotes();
-    renderNoteList(lastNotes);
+  } finally {
+    saving = false;
   }
 }
 
@@ -1074,6 +1097,7 @@ function renderMarkdown(src) {
     // Sanitize URLs — allowlist: only http(s) and relative paths
     function safeUrl(url) {
       const decoded = url.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').trim();
+      if (/^\s/.test(url)) return null;
       if (/^https?:\/\//i.test(decoded)) return url;
       if (/^[/#.]/.test(decoded)) return url;
       // Block everything else (javascript:, data:, vbscript:, etc.)
@@ -1226,6 +1250,22 @@ function togglePreview() {
   if (previewing) updatePreview();
 }
 
+function sanitizeHtml(html) {
+  const el = document.createElement("div");
+  el.innerHTML = html;
+  el.querySelectorAll("script,iframe,object,embed,form").forEach(n => n.remove());
+  el.querySelectorAll("*").forEach(n => {
+    for (const attr of [...n.attributes]) {
+      if (attr.name.startsWith("on")) n.removeAttribute(attr.name);
+      if ((attr.name === "href" || attr.name === "src" || attr.name === "action") &&
+          /^\s*(javascript|data|vbscript):/i.test(attr.value)) {
+        n.removeAttribute(attr.name);
+      }
+    }
+  });
+  return el.innerHTML;
+}
+
 function updatePreview() {
   if (!previewing) return;
 
@@ -1235,14 +1275,7 @@ function updatePreview() {
     previewEl.classList.add("hidden");
     mdPreviewEl.classList.remove("hidden");
     const rendered = renderMarkdown(content);
-    mdPreviewEl.innerHTML = rendered;
-    // Strip any script/event handler injection from rendered HTML
-    mdPreviewEl.querySelectorAll("script").forEach((el) => el.remove());
-    mdPreviewEl.querySelectorAll("*").forEach((el) => {
-      for (const attr of [...el.attributes]) {
-        if (attr.name.startsWith("on")) el.removeAttribute(attr.name);
-      }
-    });
+    mdPreviewEl.innerHTML = sanitizeHtml(rendered);
     return;
   }
 
@@ -1276,6 +1309,21 @@ function addLineNumbers(codeEl) {
 }
 
 // === Version history ===
+function trapVersionFocus(e) {
+  if (e.key !== "Tab") return;
+  const focusable = versionPanel.querySelectorAll('button, [tabindex="0"]');
+  if (!focusable.length) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (e.shiftKey && document.activeElement === first) {
+    e.preventDefault();
+    last.focus();
+  } else if (!e.shiftKey && document.activeElement === last) {
+    e.preventDefault();
+    first.focus();
+  }
+}
+
 async function openVersionHistory() {
   if (!currentNoteId) return;
   closeVersionHistory();
@@ -1315,6 +1363,7 @@ async function openVersionHistory() {
   // Focus first version item
   const firstItem = versionListEl.querySelector("li[tabindex]");
   if (firstItem) firstItem.focus();
+  versionPanel.addEventListener("keydown", trapVersionFocus);
 }
 
 function showVersionDiff(idx) {
@@ -1327,6 +1376,7 @@ function showVersionDiff(idx) {
 }
 
 function closeVersionHistory() {
+  versionPanel.removeEventListener("keydown", trapVersionFocus);
   versionPanel.classList.add("hidden");
   versionDiff.classList.add("hidden");
   versionListEl.classList.remove("hidden");
@@ -1657,6 +1707,13 @@ langSelect.addEventListener("change", () => {
 tagInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter" || e.key === ",") {
     e.preventDefault();
+    const selected = tagSuggestions.querySelector('[aria-selected="true"]');
+    if (selected) {
+      addTag(selected.textContent);
+      tagInput.value = "";
+      tagSuggestions.classList.add("hidden");
+      return;
+    }
     const val = tagInput.value.replace(/,/g, "").trim();
     if (val) {
       addTag(val);
@@ -1666,6 +1723,25 @@ tagInput.addEventListener("keydown", (e) => {
   }
   if (e.key === "Backspace" && !tagInput.value && currentNoteTags.length) {
     removeTag(currentNoteTags[currentNoteTags.length - 1]);
+  }
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+    const items = tagSuggestions.querySelectorAll('[role="option"]');
+    if (!items.length || tagSuggestions.classList.contains("hidden")) return;
+    e.preventDefault();
+    const current = tagSuggestions.querySelector('[aria-selected="true"]');
+    const idx = current ? Array.from(items).indexOf(current) : -1;
+    if (current) current.setAttribute("aria-selected", "false");
+    let next;
+    if (e.key === "ArrowDown") { next = idx < items.length - 1 ? idx + 1 : 0; }
+    else { next = idx > 0 ? idx - 1 : items.length - 1; }
+    items[next].setAttribute("aria-selected", "true");
+    items[next].scrollIntoView({ block: "nearest" });
+  }
+  if (e.key === "Escape" && !tagSuggestions.classList.contains("hidden")) {
+    e.preventDefault();
+    e.stopPropagation();
+    tagSuggestions.classList.add("hidden");
+    return;
   }
 });
 tagInput.addEventListener("input", () => {

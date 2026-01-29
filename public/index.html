@@ -29,12 +29,13 @@
   </script>
 </head>
 <body>
+  <a href="#editor-area" class="skip-link">Skip to editor</a>
   <div id="offline-banner" class="offline-banner hidden" role="alert" aria-live="assertive">
     You are offline — changes are saved locally and will sync when reconnected
   </div>
   <div class="layout">
     <!-- Mobile overlay -->
-    <div id="sidebar-overlay" class="sidebar-overlay hidden"></div>
+    <div id="sidebar-overlay" class="sidebar-overlay hidden" aria-hidden="true"></div>
 
     <!-- Sidebar -->
     <aside id="sidebar" class="sidebar" aria-label="Notes list">
@@ -67,7 +68,7 @@
       <!-- Bulk actions bar -->
       <div id="bulk-bar" class="bulk-bar hidden">
         <label class="bulk-select-all"><input type="checkbox" id="bulk-select-all"> All</label>
-        <span id="bulk-count">0 selected</span>
+        <span id="bulk-count" aria-live="polite">0 selected</span>
         <button id="bulk-tag" class="toolbar-btn bulk-btn" title="Add tag to selected">Tag</button>
         <button id="bulk-delete" class="toolbar-btn bulk-btn bulk-btn-danger" title="Delete selected">Delete</button>
         <button id="bulk-cancel" class="toolbar-btn bulk-btn" title="Cancel selection">Cancel</button>
@@ -149,7 +150,7 @@
         <pre id="note-preview" class="hidden" aria-label="Syntax highlighted preview"><code></code></pre>
         <div id="md-preview" class="hidden md-preview" aria-label="Markdown preview"></div>
         <!-- Version history panel -->
-        <div id="version-panel" class="version-panel hidden">
+        <div id="version-panel" class="version-panel hidden" role="dialog" aria-modal="true" aria-label="Version history">
           <div class="version-panel-header">
             <strong>Version History</strong>
             <button id="version-close" class="toolbar-btn" aria-label="Close version history">Close</button>
@@ -158,7 +159,7 @@
           <div id="version-diff" class="version-diff hidden">
             <div class="version-diff-header">
               <span id="version-diff-date"></span>
-              <button id="version-restore" class="toolbar-btn">Restore</button>
+              <button id="version-restore" class="toolbar-btn" aria-label="Restore this version">Restore</button>
               <button id="version-diff-close" class="toolbar-btn">Back</button>
             </div>
             <pre id="version-content" class="version-content"></pre>
