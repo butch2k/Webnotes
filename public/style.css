@@ -1033,3 +1033,89 @@ body:has(.offline-banner:not(.hidden)) .layout {
   .md-preview h1, .md-preview h2, .md-preview h3,
   .md-preview h4, .md-preview h5, .md-preview h6 { color: black; }
 }
+
+/* Task list checkboxes */
+.md-preview .task-list-item {
+  list-style: none;
+  margin-left: -1.5em;
+}
+.md-preview .task-list-item input[type="checkbox"] {
+  margin-right: 0.4em;
+  vertical-align: middle;
+}
+
+/* Footnotes */
+.md-preview .footnotes {
+  border-top: 1px solid var(--border);
+  margin-top: 2em;
+  padding-top: 1em;
+  font-size: 0.9em;
+}
+.md-preview .footnotes ol {
+  padding-left: 1.5em;
+}
+.md-preview .footnote-ref {
+  text-decoration: none;
+  color: var(--accent);
+}
+.md-preview .footnote-backref {
+  text-decoration: none;
+  margin-left: 0.3em;
+  color: var(--accent);
+}
+
+/* Table of Contents */
+.md-preview .toc {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1em 1.5em;
+  margin: 1em 0;
+}
+.md-preview .toc ul {
+  list-style: none;
+  padding-left: 1.2em;
+  margin: 0;
+}
+.md-preview .toc > ul {
+  padding-left: 0;
+}
+.md-preview .toc li {
+  margin: 0.3em 0;
+}
+.md-preview .toc a {
+  text-decoration: none;
+  color: var(--text-primary);
+}
+.md-preview .toc a:hover {
+  color: var(--accent);
+}
+
+/* Mermaid diagrams */
+.md-preview .mermaid {
+  background: var(--bg-secondary);
+  border-radius: 6px;
+  padding: 1em;
+  margin: 0.8em 0;
+  text-align: center;
+  overflow-x: auto;
+}
+
+/* KaTeX blocks */
+.md-preview .katex-display {
+  overflow-x: auto;
+  padding: 0.5em 0;
+}
+
+/* Pasted images */
+.md-preview img[src^="data:image/"] {
+  max-width: 100%;
+  border-radius: 4px;
+  margin: 0.5em 0;
+}
+
+/* Wrap toggle active */
+#btn-wrap.active {
+  background: var(--accent);
+  color: var(--accent-on);
+}

@@ -23,10 +23,11 @@ function createApp(dbModule) {
       contentSecurityPolicy: {
         directives: {
           defaultSrc: ["'self'"],
-          scriptSrc: ["'self'", "https://cdnjs.cloudflare.com", "https://esm.sh", "'sha256-SNGGNs0Fj0qx1hYYbbNwH+xI7xjt+v10rkTxVCQ4Grw='", "'sha256-Nny8H/je5llKyTsleHxYL8feCRalb8GOIQ20BMZf8DE='", "'sha256-qnbl7ughnhiwU+erhELQjfSnGqj3thjsxYq9/zMMZXo='"],
+          scriptSrc: ["'self'", "'unsafe-eval'", "https://cdnjs.cloudflare.com", "https://esm.sh", "'sha256-SNGGNs0Fj0qx1hYYbbNwH+xI7xjt+v10rkTxVCQ4Grw='", "'sha256-Nny8H/je5llKyTsleHxYL8feCRalb8GOIQ20BMZf8DE='", "'sha256-qnbl7ughnhiwU+erhELQjfSnGqj3thjsxYq9/zMMZXo='"],
           workerSrc: ["'self'"],
           imgSrc: ["'self'", "https:", "data:"],
           styleSrc: ["'self'", "https://cdnjs.cloudflare.com", "'unsafe-inline'"],
+          fontSrc: ["'self'", "https://cdnjs.cloudflare.com"],
           connectSrc: ["'self'", "https://esm.sh"],
         },
       },

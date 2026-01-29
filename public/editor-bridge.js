@@ -4,6 +4,7 @@ window.EditorBridge = (function() {
   let view = null;
   let languageCompartment = null;
   let themeCompartment = null;
+  let wrapCompartment = null;
   let updateCallback = null;
   let mochaSyntax = null;
   let latteSyntax = null;
@@ -169,6 +170,7 @@ window.EditorBridge = (function() {
     // Create compartments for dynamic configuration
     languageCompartment = new CM.Compartment();
     themeCompartment = new CM.Compartment();
+    wrapCompartment = new CM.Compartment();
 
     // Build extensions array
     const extensions = [
@@ -205,7 +207,7 @@ window.EditorBridge = (function() {
       CM.indentUnit.of("  "),
 
       // Line wrapping
-      CM.EditorView.lineWrapping,
+      wrapCompartment.of(CM.EditorView.lineWrapping),
 
       // Update listener for changes
       CM.EditorView.updateListener.of((update) => {
@@ -290,12 +292,21 @@ window.EditorBridge = (function() {
     return view;
   }
 
+  function setLineWrapping(enabled) {
+    if (!view || !wrapCompartment) return;
+    const CM = window.CM;
+    view.dispatch({
+      effects: wrapCompartment.reconfigure(enabled ? CM.EditorView.lineWrapping : [])
+    });
+  }
+
   function destroy() {
     if (view) {
       view.destroy();
       view = null;
       languageCompartment = null;
       themeCompartment = null;
+      wrapCompartment = null;
       updateCallback = null;
     }
   }
@@ -306,6 +317,7 @@ window.EditorBridge = (function() {
     setValue,
     setLanguage,
     setTheme,
+    setLineWrapping,
     focus,
     onUpdate,
     openSearch,
