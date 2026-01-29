@@ -644,6 +644,41 @@ body:has(.offline-banner:not(.hidden)) .layout {
   background: var(--bg-primary);
 }
 
+/* Find bar */
+.find-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+}
+.find-bar input {
+  flex: 1;
+  min-width: 100px;
+  max-width: 260px;
+  padding: 3px 8px;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+.find-bar input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.find-count {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.find-btn {
+  padding: 2px 6px;
+  font-size: 12px;
+  min-width: auto;
+}
+
 /* Status bar */
 .status-bar {
   padding: 4px 16px;

@@ -1375,8 +1375,119 @@ contentArea.addEventListener("keydown", (e) => {
 });
 contentArea.addEventListener("focus", () => { tabTrapped = true; });
 
+// === Find in note ===
+const findBar = document.getElementById("find-bar");
+const findInput = document.getElementById("find-input");
+const findCount = document.getElementById("find-count");
+let findMatches = [];
+let findIdx = -1;
+
+function openFindBar() {
+  findBar.classList.remove("hidden");
+  findInput.focus();
+  const sel = contentArea.value.substring(contentArea.selectionStart, contentArea.selectionEnd);
+  if (sel && sel.length < 200) {
+    findInput.value = sel;
+  }
+  findInput.select();
+  runFind();
+}
+
+function closeFindBar() {
+  findBar.classList.add("hidden");
+  findMatches = [];
+  findIdx = -1;
+  findCount.textContent = "";
+  contentArea.focus();
+}
+
+function runFind() {
+  const q = findInput.value;
+  findMatches = [];
+  findIdx = -1;
+  if (!q) {
+    findCount.textContent = "";
+    return;
+  }
+  const text = contentArea.value.toLowerCase();
+  const ql = q.toLowerCase();
+  let pos = 0;
+  while ((pos = text.indexOf(ql, pos)) !== -1) {
+    findMatches.push(pos);
+    pos += ql.length;
+  }
+  if (findMatches.length) {
+    findIdx = 0;
+    // Jump to nearest match from cursor
+    const cursor = contentArea.selectionStart;
+    for (let i = 0; i < findMatches.length; i++) {
+      if (findMatches[i] >= cursor) { findIdx = i; break; }
+    }
+    selectMatch();
+  }
+  updateFindCount();
+}
+
+function selectMatch() {
+  if (findIdx < 0 || !findMatches.length) return;
+  const pos = findMatches[findIdx];
+  contentArea.focus();
+  contentArea.setSelectionRange(pos, pos + findInput.value.length);
+  // Scroll textarea to selection — set cursor briefly to scroll, then restore selection
+  const len = findInput.value.length;
+  contentArea.blur();
+  contentArea.setSelectionRange(pos, pos + len);
+  contentArea.focus();
+}
+
+function updateFindCount() {
+  if (!findMatches.length && findInput.value) {
+    findCount.textContent = "No results";
+  } else if (findMatches.length) {
+    findCount.textContent = (findIdx + 1) + " of " + findMatches.length;
+  } else {
+    findCount.textContent = "";
+  }
+}
+
+function findNext() {
+  if (!findMatches.length) return;
+  findIdx = (findIdx + 1) % findMatches.length;
+  selectMatch();
+  updateFindCount();
+}
+
+function findPrev() {
+  if (!findMatches.length) return;
+  findIdx = (findIdx - 1 + findMatches.length) % findMatches.length;
+  selectMatch();
+  updateFindCount();
+}
+
+findInput.addEventListener("input", runFind);
+findInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    if (e.shiftKey) findPrev(); else findNext();
+  }
+  if (e.key === "Escape") {
+    e.preventDefault();
+    closeFindBar();
+  }
+});
+document.getElementById("find-next").addEventListener("click", findNext);
+document.getElementById("find-prev").addEventListener("click", findPrev);
+document.getElementById("find-close").addEventListener("click", closeFindBar);
+
 // === Keyboard shortcuts ===
 document.addEventListener("keydown", (e) => {
+  // Ctrl+F opens find bar when a note is open
+  if ((e.ctrlKey || e.metaKey) && e.key === "f" && currentNoteId && !editorArea.classList.contains("hidden")) {
+    e.preventDefault();
+    openFindBar();
+    return;
+  }
+
   // Ctrl+A selects note content when a note is open and focus is not in an input
   if ((e.ctrlKey || e.metaKey) && e.key === "a" && currentNoteId && !editorArea.classList.contains("hidden")) {
     const tag = document.activeElement && document.activeElement.tagName;
@@ -1414,6 +1525,10 @@ document.addEventListener("keydown", (e) => {
   }
 
   if (e.key === "Escape") {
+    if (!findBar.classList.contains("hidden")) {
+      closeFindBar();
+      return;
+    }
     if (!versionPanel.classList.contains("hidden")) {
       const diffView = document.getElementById("version-diff");
       if (!diffView.classList.contains("hidden")) {

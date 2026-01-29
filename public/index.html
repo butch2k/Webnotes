@@ -135,6 +135,14 @@
           <button id="btn-delete" title="Delete note" aria-label="Delete note">Delete</button>
           <span class="save-indicator" role="status" aria-live="polite"></span>
         </div>
+        <div id="find-bar" class="find-bar hidden">
+          <label for="find-input" class="sr-only">Find in note</label>
+          <input id="find-input" type="text" placeholder="Find…" autocomplete="off">
+          <span id="find-count" class="find-count"></span>
+          <button id="find-prev" class="toolbar-btn find-btn" title="Previous (Shift+Enter)" aria-label="Previous match">&#9650;</button>
+          <button id="find-next" class="toolbar-btn find-btn" title="Next (Enter)" aria-label="Next match">&#9660;</button>
+          <button id="find-close" class="toolbar-btn find-btn" title="Close (Escape)" aria-label="Close find bar">&#10005;</button>
+        </div>
         <label for="note-content" class="sr-only">Note content</label>
         <textarea id="note-content" placeholder="Paste or type your text here…" spellcheck="false"></textarea>
         <pre id="note-preview" class="hidden" aria-label="Syntax highlighted preview"><code></code></pre>
