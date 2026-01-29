@@ -704,10 +704,8 @@ function renderMarkdown(src) {
       i++; // skip closing ```
       const codeRaw = codeLines.join("\n");
       let codeHtml = esc(codeRaw);
-      if (lang && typeof hljs !== "undefined") {
-        try {
-          codeHtml = hljs.highlight(codeRaw, { language: lang }).value;
-        } catch { /* ignore unknown language */ }
+      if (lang && typeof hljs !== "undefined" && hljs.getLanguage(lang)) {
+        codeHtml = hljs.highlight(codeRaw, { language: lang }).value;
       }
       out.push('<pre><code class="' + (lang ? "language-" + esc(lang) : "") + '">' + codeHtml + "</code></pre>");
       continue;
@@ -831,12 +829,9 @@ function updatePreview() {
     if (lang === "auto") {
       const result = hljs.highlightAuto(contentArea.value);
       code.innerHTML = result.value;
-    } else if (lang !== "plaintext") {
+    } else if (lang !== "plaintext" && hljs.getLanguage(lang)) {
       code.classList.add("language-" + lang);
-      try {
-        const result = hljs.highlight(contentArea.value, { language: lang });
-        code.innerHTML = result.value;
-      } catch { /* unknown language — leave as plaintext */ }
+      code.innerHTML = hljs.highlight(contentArea.value, { language: lang }).value;
     }
   }
 
