@@ -552,6 +552,32 @@ function renderNoteList(notes) {
       <span class="note-item-meta">${escapeHtml(n.language)} &middot; ${date}${nbLabel}</span>
     `;
 
+    // Unfile button when viewing a specific notebook
+    if (currentNotebook && n.notebook && !bulkMode) {
+      const unfile = document.createElement("button");
+      unfile.className = "btn-unfile";
+      unfile.title = "Remove from notebook";
+      unfile.setAttribute("aria-label", "Remove from notebook");
+      unfile.textContent = "\u00D7";
+      unfile.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        try {
+          await api("/notes/" + n.id, {
+            method: "PUT",
+            body: JSON.stringify({ notebook: "" }),
+          });
+        } catch {
+          enqueue({ type: "update", noteId: n.id, data: { notebook: "" } });
+        }
+        if (n.id === currentNoteId) {
+          notebookInput.value = "";
+        }
+        loadNotes();
+        loadNotebooks();
+      });
+      li.appendChild(unfile);
+    }
+
     if (bulkMode) {
       const cb = document.createElement("input");
       cb.type = "checkbox";

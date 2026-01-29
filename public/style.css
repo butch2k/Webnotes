@@ -372,6 +372,32 @@ body:has(.offline-banner:not(.hidden)) .layout {
   margin-top: 2px;
 }
 
+.btn-unfile {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1;
+  padding: 1px 5px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+#note-list li {
+  position: relative;
+}
+#note-list li:hover .btn-unfile {
+  opacity: 1;
+}
+.btn-unfile:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
 /* Search highlight */
 .search-hl {
   background: var(--highlight-bg);
