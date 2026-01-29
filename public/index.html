@@ -96,8 +96,6 @@
           <input id="note-title" type="text" placeholder="Title…">
           <label for="note-lang" class="sr-only">Syntax language</label>
           <select id="note-lang">
-            <option value="auto">Auto-detect</option>
-            <option value="plaintext">Plain text</option>
             <option value="bash">Bash</option>
             <option value="c">C</option>
             <option value="cpp">C++</option>
@@ -106,18 +104,25 @@
             <option value="dockerfile">Dockerfile</option>
             <option value="go">Go</option>
             <option value="html">HTML</option>
-            <option value="ini">Conf / INI</option>
             <option value="java">Java</option>
             <option value="javascript">JavaScript</option>
             <option value="json">JSON</option>
+            <option value="kotlin">Kotlin</option>
+            <option value="lua">Lua</option>
             <option value="markdown">Markdown</option>
             <option value="nginx">Nginx</option>
+            <option value="perl">Perl</option>
             <option value="php">PHP</option>
-            <option value="properties">Properties</option>
+            <option value="plaintext">Plain text</option>
+            <option value="powershell">PowerShell</option>
             <option value="python">Python</option>
+            <option value="r">R</option>
             <option value="ruby">Ruby</option>
             <option value="rust">Rust</option>
+            <option value="scala">Scala</option>
             <option value="sql">SQL</option>
+            <option value="swift">Swift</option>
+            <option value="toml">TOML</option>
             <option value="typescript">TypeScript</option>
             <option value="xml">XML</option>
             <option value="yaml">YAML</option>
@@ -138,16 +143,8 @@
             <ul id="tag-suggestions" class="nb-suggestions hidden" role="listbox"></ul>
           </div>
         </div>
-        <div id="find-bar" class="find-bar hidden">
-          <label for="find-input" class="sr-only">Find in note</label>
-          <input id="find-input" type="text" placeholder="Find…" autocomplete="off">
-          <span id="find-count" class="find-count"></span>
-          <button id="find-prev" class="toolbar-btn find-btn" title="Previous (Shift+Enter)" aria-label="Previous match">&#9650;</button>
-          <button id="find-next" class="toolbar-btn find-btn" title="Next (Enter)" aria-label="Next match">&#9660;</button>
-          <button id="find-close" class="toolbar-btn find-btn" title="Close (Escape)" aria-label="Close find bar">&#10005;</button>
-        </div>
-        <label for="note-content" class="sr-only">Note content</label>
-        <textarea id="note-content" placeholder="Paste or type your text here…" spellcheck="false"></textarea>
+        <label for="note-content-cm" class="sr-only">Note content</label>
+        <div id="note-content-cm"></div>
         <pre id="note-preview" class="hidden" aria-label="Syntax highlighted preview"><code></code></pre>
         <div id="md-preview" class="hidden md-preview" aria-label="Markdown preview"></div>
         <!-- Version history panel -->
@@ -179,7 +176,10 @@
     integrity="sha512-D9gUyxqja7hBtkWpPWGt9wfbfaMGVt9gnyCvYa+jojwwPHLCzUm5i8rpk7vD7wNee9bA35eYIjobYPaQuKS1MQ=="
     crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <script>if(typeof hljs!=="undefined"){hljs.highlightAll=function(){};const o=hljs.highlightElement.bind(hljs);hljs.highlightElement=function(e){delete e.dataset.highlighted;o(e)}}</script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/powershell.min.js"></script>
   <script src="hljs-extra-langs.js"></script>
+  <script type="module" src="codemirror-loader.js"></script>
+  <script src="editor-bridge.js"></script>
   <script src="app.js"></script>
   <script>
     if ("serviceWorker" in navigator) {
