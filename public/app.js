@@ -157,8 +157,9 @@ window.addEventListener("offline", () => setOnline(false));
 
 // === API helpers ===
 async function apiRaw(path, opts = {}) {
+  const headers = opts.body ? { "Content-Type": "application/json" } : {};
   const res = await fetch("/api" + path, {
-    headers: { "Content-Type": "application/json" },
+    headers,
     ...opts,
   });
   if (res.status === 204) return null;
@@ -206,7 +207,9 @@ searchInput.addEventListener("input", () => {
 async function serverSearch() {
   if (!searchQuery) return;
   try {
-    const notes = await api("/notes?q=" + encodeURIComponent(searchQuery));
+    const params = ["q=" + encodeURIComponent(searchQuery)];
+    if (currentNotebook !== null) params.push("notebook=" + encodeURIComponent(currentNotebook));
+    const notes = await api("/notes?" + params.join("&"));
     if (searchQuery === searchInput.value.trim()) {
       lastNotes = notes;
       renderNoteList(notes);
@@ -375,7 +378,6 @@ async function openNote(id) {
     showEditor();
     updatePinButton();
     updateStats();
-    if (note.content) togglePreview();
     loadNotes();
   } catch {
     const cached = getCachedNotes().find((n) => n.id === id);
@@ -389,7 +391,6 @@ async function openNote(id) {
       showEditor();
       updatePinButton();
       updateStats();
-      if (cached.content) togglePreview();
       renderNoteList(getCachedNotes());
     }
   }
@@ -615,7 +616,7 @@ function exportNote() {
   a.href = url;
   a.download = filename;
   a.click();
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
   flashSaved("Downloaded!");
 }
 
@@ -651,8 +652,11 @@ function renderMarkdown(src) {
   function inline(text) {
     // Sanitize URLs — only allow http(s) and relative paths
     function safeUrl(url) {
-      const decoded = url.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"');
-      if (/^https?:\/\//i.test(decoded) || /^[/#.]/.test(decoded)) return url;
+      const decoded = url.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').trim();
+      if (/^https?:\/\//i.test(decoded)) return url;
+      // Allow relative paths but block any scheme (data:, blob:, javascript:, vbscript:, etc.)
+      if (/^[a-zA-Z][a-zA-Z0-9+\-.]*:/i.test(decoded)) return "";
+      if (/^[/#.]/.test(decoded)) return url;
       return "";
     }
     // Images before links
@@ -1043,8 +1047,11 @@ langSelect.addEventListener("change", () => {
   updatePreview();
 });
 notebookInput.addEventListener("change", () => {
-  scheduleSave();
-  loadNotebooks();
+  dirty = true;
+  clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(() => {
+    saveNote().then(() => loadNotebooks());
+  }, 600);
 });
 
 // === Unsaved changes warning ===
