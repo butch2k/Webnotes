@@ -2,7 +2,6 @@ require("dotenv").config();
 const express = require("express");
 const helmet = require("helmet");
 const path = require("path");
-const { pool, initDb } = require("./db");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -43,48 +42,25 @@ function validateId(req, res, next) {
   next();
 }
 
+// Storage backend — set after init
+let db;
+
 // Health check
 app.get("/health", async (req, res) => {
   try {
-    await pool.query("SELECT 1");
-    res.json({ status: "ok", db: "connected" });
+    const result = await db.healthCheck();
+    res.json(result);
   } catch {
     res.status(503).json({ status: "error", db: "disconnected" });
   }
 });
 
-// List all notes — supports ?q= for full-text search
+// List notes
 app.get("/api/notes", async (req, res, next) => {
   try {
     const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
-    let rows;
-    if (q) {
-      // Sanitize: strip tsquery special chars, split into tokens, join with &
-      const tokens = q
-        .replace(/[&|!<>():*'"\\]/g, " ")
-        .split(/\s+/)
-        .filter(Boolean);
-      if (!tokens.length) {
-        ({ rows } = await pool.query(
-          "SELECT id, title, content, language, created_at, updated_at FROM notes ORDER BY updated_at DESC"
-        ));
-      } else {
-        const tsquery = tokens.map((t) => t + ":*").join(" & ");
-        ({ rows } = await pool.query(
-          `SELECT id, title, content, language, created_at, updated_at,
-                  ts_rank(search_vector, to_tsquery('english', $1)) AS rank
-           FROM notes
-           WHERE search_vector @@ to_tsquery('english', $1)
-           ORDER BY rank DESC, updated_at DESC`,
-          [tsquery]
-        ));
-      }
-    } else {
-      ({ rows } = await pool.query(
-        "SELECT id, title, content, language, created_at, updated_at FROM notes ORDER BY updated_at DESC"
-      ));
-    }
-    res.json(rows);
+    const notes = await db.listNotes(q || null);
+    res.json(notes);
   } catch (err) {
     next(err);
   }
@@ -93,11 +69,9 @@ app.get("/api/notes", async (req, res, next) => {
 // Get single note
 app.get("/api/notes/:id", validateId, async (req, res, next) => {
   try {
-    const { rows } = await pool.query("SELECT * FROM notes WHERE id = $1", [
-      req.params.id,
-    ]);
-    if (!rows.length) return res.status(404).json({ error: "Not found" });
-    res.json(rows[0]);
+    const note = await db.getNote(req.params.id);
+    if (!note) return res.status(404).json({ error: "Not found" });
+    res.json(note);
   } catch (err) {
     next(err);
   }
@@ -106,12 +80,8 @@ app.get("/api/notes/:id", validateId, async (req, res, next) => {
 // Create note
 app.post("/api/notes", validateNote, async (req, res, next) => {
   try {
-    const { title, content, language } = req.body;
-    const { rows } = await pool.query(
-      "INSERT INTO notes (title, content, language) VALUES ($1, $2, $3) RETURNING *",
-      [title || "Untitled", content || "", language || "plaintext"]
-    );
-    res.status(201).json(rows[0]);
+    const note = await db.createNote(req.body);
+    res.status(201).json(note);
   } catch (err) {
     next(err);
   }
@@ -120,14 +90,9 @@ app.post("/api/notes", validateNote, async (req, res, next) => {
 // Update note
 app.put("/api/notes/:id", validateId, validateNote, async (req, res, next) => {
   try {
-    const { title, content, language } = req.body;
-    const { rows } = await pool.query(
-      `UPDATE notes SET title = $1, content = $2, language = $3, updated_at = NOW()
-       WHERE id = $4 RETURNING *`,
-      [title, content, language, req.params.id]
-    );
-    if (!rows.length) return res.status(404).json({ error: "Not found" });
-    res.json(rows[0]);
+    const note = await db.updateNote(req.params.id, req.body);
+    if (!note) return res.status(404).json({ error: "Not found" });
+    res.json(note);
   } catch (err) {
     next(err);
   }
@@ -136,29 +101,47 @@ app.put("/api/notes/:id", validateId, validateNote, async (req, res, next) => {
 // Delete note
 app.delete("/api/notes/:id", validateId, async (req, res, next) => {
   try {
-    const { rowCount } = await pool.query("DELETE FROM notes WHERE id = $1", [
-      req.params.id,
-    ]);
-    if (!rowCount) return res.status(404).json({ error: "Not found" });
+    const deleted = await db.deleteNote(req.params.id);
+    if (!deleted) return res.status(404).json({ error: "Not found" });
     res.status(204).end();
   } catch (err) {
     next(err);
   }
 });
 
-// Error handler — don't leak internals
+// Error handler
 app.use((err, req, res, _next) => {
   console.error(err);
   res.status(500).json({ error: "Internal server error" });
 });
 
-initDb()
-  .then(() => {
-    app.listen(PORT, () =>
-      console.log(`Webnotes running on http://localhost:${PORT}`)
-    );
-  })
-  .catch((err) => {
-    console.error("Failed to initialize database:", err);
-    process.exit(1);
-  });
+// Pick storage backend and start
+async function start() {
+  const pgConfigured = process.env.PGHOST || process.env.PGDATABASE || process.env.PGUSER;
+
+  if (pgConfigured) {
+    try {
+      db = require("./db");
+      await db.initDb();
+      console.log("Storage: PostgreSQL");
+    } catch (err) {
+      console.warn("PostgreSQL unavailable, falling back to file storage:", err.message);
+      db = require("./db-file");
+      await db.initDb();
+      console.log("Storage: file system");
+    }
+  } else {
+    db = require("./db-file");
+    await db.initDb();
+    console.log("Storage: file system");
+  }
+
+  app.listen(PORT, () =>
+    console.log(`Webnotes running on http://localhost:${PORT}`)
+  );
+}
+
+start().catch((err) => {
+  console.error("Failed to start:", err);
+  process.exit(1);
+});

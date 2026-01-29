@@ -20,7 +20,6 @@ async function initDb() {
     )
   `);
 
-  // Full-text search: generated tsvector column + GIN index
   await pool.query(`
     DO $$ BEGIN
       IF NOT EXISTS (
@@ -38,4 +37,61 @@ async function initDb() {
   `);
 }
 
-module.exports = { pool, initDb };
+async function listNotes(q) {
+  if (q) {
+    const tokens = q
+      .replace(/[&|!<>():*'"\\]/g, " ")
+      .split(/\s+/)
+      .filter(Boolean);
+    if (tokens.length) {
+      const tsquery = tokens.map((t) => t + ":*").join(" & ");
+      const { rows } = await pool.query(
+        `SELECT id, title, content, language, created_at, updated_at,
+                ts_rank(search_vector, to_tsquery('english', $1)) AS rank
+         FROM notes
+         WHERE search_vector @@ to_tsquery('english', $1)
+         ORDER BY rank DESC, updated_at DESC`,
+        [tsquery]
+      );
+      return rows;
+    }
+  }
+  const { rows } = await pool.query(
+    "SELECT id, title, content, language, created_at, updated_at FROM notes ORDER BY updated_at DESC"
+  );
+  return rows;
+}
+
+async function getNote(id) {
+  const { rows } = await pool.query("SELECT * FROM notes WHERE id = $1", [id]);
+  return rows[0] || null;
+}
+
+async function createNote({ title, content, language }) {
+  const { rows } = await pool.query(
+    "INSERT INTO notes (title, content, language) VALUES ($1, $2, $3) RETURNING *",
+    [title || "Untitled", content || "", language || "plaintext"]
+  );
+  return rows[0];
+}
+
+async function updateNote(id, { title, content, language }) {
+  const { rows } = await pool.query(
+    `UPDATE notes SET title = $1, content = $2, language = $3, updated_at = NOW()
+     WHERE id = $4 RETURNING *`,
+    [title, content, language, id]
+  );
+  return rows[0] || null;
+}
+
+async function deleteNote(id) {
+  const { rowCount } = await pool.query("DELETE FROM notes WHERE id = $1", [id]);
+  return rowCount > 0;
+}
+
+async function healthCheck() {
+  await pool.query("SELECT 1");
+  return { status: "ok", db: "connected" };
+}
+
+module.exports = { initDb, listNotes, getNote, createNote, updateNote, deleteNote, healthCheck };

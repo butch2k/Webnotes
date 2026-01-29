@@ -40,7 +40,7 @@ docker compose down -v
 ### Requirements
 
 - Node.js 18+
-- PostgreSQL
+- PostgreSQL (optional — falls back to file-based JSON storage in `./data/`)
 
 ### Setup
 
@@ -80,3 +80,6 @@ The app runs at `http://localhost:3000`. The database table and full-text search
 | `PGPASSWORD` | `postgres`   | PostgreSQL password      |
 | `PGDATABASE` | `webnotes`   | PostgreSQL database name |
 | `PORT`       | `3000`       | HTTP server port         |
+| `WEBNOTES_DATA_DIR` | `./data` | Directory for file-based storage |
+
+If none of `PGHOST`, `PGDATABASE`, or `PGUSER` are set, the app uses file-based JSON storage instead of PostgreSQL. If PostgreSQL is configured but unreachable, it also falls back to file storage automatically.
