@@ -269,7 +269,7 @@ async function openNote(id) {
     langSelect.value = note.language;
     contentArea.value = note.content;
     showEditor();
-    updatePreview();
+    if (note.content) togglePreview();
     loadNotes();
   } catch {
     const cached = getCachedNotes().find((n) => n.id === id);
@@ -279,7 +279,7 @@ async function openNote(id) {
       langSelect.value = cached.language || "plaintext";
       contentArea.value = cached.content || "";
       showEditor();
-      updatePreview();
+      if (cached.content) togglePreview();
       renderNoteList(getCachedNotes());
     }
   }
