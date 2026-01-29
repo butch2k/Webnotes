@@ -56,6 +56,7 @@ let bulkMode = false;
 let selectedIds = new Set();
 let currentVersions = [];
 let selectedVersionIdx = -1;
+let suppressUpdate = false;
 
 // === Theme ===
 const THEME_KEY = "webnotes_theme";
@@ -725,15 +726,17 @@ async function openNote(id) {
     currentNoteTags = Array.isArray(note.tags) ? [...note.tags] : [];
     titleInput.value = note.title;
     langSelect.value = note.language;
+    suppressUpdate = true;
     window.EditorBridge.setValue(note.content);
     window.EditorBridge.setLanguage(note.language);
+    suppressUpdate = false;
     renderCurrentTags();
     showEditor();
     updatePinButton();
     updateStats();
     updateTimestamps();
-    if (note.content && !previewing) togglePreview();
-    loadNotes();
+    updatePreviewButton();
+    renderNoteList(lastNotes);
   } catch {
     const cached = getCachedNotes().find((n) => n.id === id);
     if (cached) {
@@ -744,14 +747,16 @@ async function openNote(id) {
       currentNoteTags = Array.isArray(cached.tags) ? [...cached.tags] : [];
       titleInput.value = cached.title;
       langSelect.value = cached.language || "plaintext";
+      suppressUpdate = true;
       window.EditorBridge.setValue(cached.content || "");
       window.EditorBridge.setLanguage(cached.language || "plaintext");
+      suppressUpdate = false;
       renderCurrentTags();
       showEditor();
       updatePinButton();
       updateStats();
       updateTimestamps();
-      if (cached.content && !previewing) togglePreview();
+      updatePreviewButton();
       renderNoteList(getCachedNotes());
     }
   }
@@ -844,7 +849,7 @@ async function createNoteFromFile(filename, content, language) {
     updatePinButton();
     updateStats();
     updateTimestamps();
-    if (note.content) togglePreview();
+    updatePreviewButton();
     await loadNotes();
     loadTags();
   } catch {
@@ -879,7 +884,7 @@ async function createNoteFromFile(filename, content, language) {
     updatePinButton();
     updateStats();
     updateTimestamps();
-    if (content) togglePreview();
+    updatePreviewButton();
     lastNotes = getCachedNotes();
     renderNoteList(lastNotes);
   }
@@ -910,7 +915,12 @@ async function saveNote() {
       updateTimestamps();
     }
     flashSaved();
-    loadNotes();
+    // Update lastNotes in place and re-render without full reload
+    const idx = lastNotes.findIndex((n) => n.id === currentNoteId);
+    if (idx !== -1) {
+      Object.assign(lastNotes[idx], data, { updated_at: note ? note.updated_at : lastNotes[idx].updated_at });
+    }
+    renderNoteList(lastNotes);
   } catch {
     enqueue({ type: "save", noteId: currentNoteId, data });
     const cached = getCachedNotes();
@@ -989,16 +999,18 @@ async function copyToClipboard() {
 const LANG_TO_EXT = {
   javascript: "js", typescript: "ts", python: "py", java: "java",
   c: "c", cpp: "cpp", csharp: "cs", go: "go", rust: "rs", ruby: "rb",
-  php: "php", sql: "sql", bash: "sh", html: "html", css: "css",
+  php: "php", powershell: "ps1", sql: "sql", bash: "sh", html: "html", css: "css",
   json: "json", yaml: "yml", xml: "xml", markdown: "md",
   ini: "ini", nginx: "conf", properties: "properties",
   dockerfile: "Dockerfile", plaintext: "txt",
+  kotlin: "kt", scala: "scala", swift: "swift", lua: "lua",
+  perl: "pl", r: "r", toml: "toml"
 };
 
 function exportNote() {
   const content = window.EditorBridge.getValue();
   if (!currentNoteId || !content) return;
-  const lang = langSelect.value === "auto" ? "plaintext" : langSelect.value;
+  const lang = langSelect.value;
   const ext = LANG_TO_EXT[lang] || "txt";
   const title = titleInput.value || "Untitled";
   const filename = lang === "dockerfile" ? "Dockerfile" : title.replace(/[^a-zA-Z0-9_\-. ]/g, "_") + "." + ext;
@@ -1190,6 +1202,15 @@ function isMarkdownMode() {
   return langSelect.value === "markdown";
 }
 
+function updatePreviewButton() {
+  const show = isMarkdownMode();
+  btnPreview.classList.toggle("hidden", !show);
+  // If switching away from markdown while previewing, exit preview
+  if (!show && previewing) {
+    togglePreview();
+  }
+}
+
 function togglePreview() {
   previewing = !previewing;
   btnPreview.classList.toggle("active", previewing);
@@ -1235,10 +1256,7 @@ function updatePreview() {
 
   const lang = langSelect.value;
   if (typeof hljs !== "undefined") {
-    if (lang === "auto") {
-      const result = hljs.highlightAuto(content);
-      code.innerHTML = result.value;
-    } else if (lang !== "plaintext" && hljs.getLanguage(lang)) {
+    if (lang !== "plaintext" && hljs.getLanguage(lang)) {
       code.classList.add("language-" + lang);
       code.innerHTML = hljs.highlight(content, { language: lang }).value;
     }
@@ -1362,7 +1380,15 @@ const EXT_TO_LANG = {
   go: "go",
   rs: "rust",
   rb: "ruby",
+  kt: "kotlin", kts: "kotlin",
+  scala: "scala", sc: "scala",
+  swift: "swift",
+  lua: "lua",
+  pl: "perl", pm: "perl",
+  r: "r",
+  toml: "toml",
   php: "php",
+  ps1: "powershell", psm1: "powershell", psd1: "powershell",
   sql: "sql",
   sh: "bash", bash: "bash", zsh: "bash",
   html: "html", htm: "html",
@@ -1428,6 +1454,7 @@ function showEditor() {
   previewEl.classList.add("hidden");
   mdPreviewEl.classList.add("hidden");
   versionPanel.classList.add("hidden");
+  updatePreviewButton();
 }
 
 function hideEditor() {
@@ -1614,12 +1641,14 @@ titleInput.addEventListener("input", scheduleSave);
 
 // Setup editor update callback
 window.EditorBridge.onUpdate(() => {
+  if (suppressUpdate) return;
   scheduleSave();
   updateStats();
 });
 
 langSelect.addEventListener("change", () => {
   window.EditorBridge.setLanguage(langSelect.value);
+  updatePreviewButton();
   scheduleSave();
   updatePreview();
 });

@@ -5,6 +5,8 @@ window.EditorBridge = (function() {
   let languageCompartment = null;
   let themeCompartment = null;
   let updateCallback = null;
+  let mochaSyntax = null;
+  let latteSyntax = null;
 
   // Language map
   const langMap = {
@@ -22,11 +24,23 @@ window.EditorBridge = (function() {
     c: () => window.CM.cpp(),
     rust: () => window.CM.rust(),
     php: () => window.CM.php(),
-    go: () => window.CM.LanguageSupport.of(window.CM.StreamLanguage.define(window.CM.go)),
-    yaml: () => window.CM.LanguageSupport.of(window.CM.StreamLanguage.define(window.CM.yaml)),
-    yml: () => window.CM.LanguageSupport.of(window.CM.StreamLanguage.define(window.CM.yaml)),
-    plaintext: () => null,
-    auto: () => null
+    go: () => new window.CM.LanguageSupport(window.CM.StreamLanguage.define(window.CM.go)),
+    yaml: () => new window.CM.LanguageSupport(window.CM.StreamLanguage.define(window.CM.yaml)),
+    yml: () => new window.CM.LanguageSupport(window.CM.StreamLanguage.define(window.CM.yaml)),
+    powershell: () => new window.CM.LanguageSupport(window.CM.StreamLanguage.define(window.CM.powerShell)),
+    bash: () => new window.CM.LanguageSupport(window.CM.StreamLanguage.define(window.CM.shell)),
+    csharp: () => new window.CM.LanguageSupport(window.CM.StreamLanguage.define(window.CM.cSharp)),
+    ruby: () => new window.CM.LanguageSupport(window.CM.StreamLanguage.define(window.CM.ruby)),
+    dockerfile: () => new window.CM.LanguageSupport(window.CM.StreamLanguage.define(window.CM.dockerFile)),
+    nginx: () => new window.CM.LanguageSupport(window.CM.StreamLanguage.define(window.CM.nginx)),
+    lua: () => new window.CM.LanguageSupport(window.CM.StreamLanguage.define(window.CM.lua)),
+    perl: () => new window.CM.LanguageSupport(window.CM.StreamLanguage.define(window.CM.perl)),
+    r: () => new window.CM.LanguageSupport(window.CM.StreamLanguage.define(window.CM.r)),
+    swift: () => new window.CM.LanguageSupport(window.CM.StreamLanguage.define(window.CM.swift)),
+    kotlin: () => new window.CM.LanguageSupport(window.CM.StreamLanguage.define(window.CM.kotlin)),
+    scala: () => new window.CM.LanguageSupport(window.CM.StreamLanguage.define(window.CM.scala)),
+    toml: () => new window.CM.LanguageSupport(window.CM.StreamLanguage.define(window.CM.toml)),
+    plaintext: () => null
   };
 
   // Catppuccin Mocha (dark) theme
@@ -106,6 +120,52 @@ window.EditorBridge = (function() {
 
     const CM = window.CM;
 
+    // Define Catppuccin Mocha syntax highlighting
+    mochaSyntax = CM.HighlightStyle.define([
+      { tag: CM.tags.keyword, color: "#cba6f7" },
+      { tag: [CM.tags.name, CM.tags.deleted, CM.tags.character, CM.tags.propertyName, CM.tags.macroName], color: "#cdd6f4" },
+      { tag: [CM.tags.function(CM.tags.variableName), CM.tags.labelName], color: "#89b4fa" },
+      { tag: [CM.tags.color, CM.tags.constant(CM.tags.name), CM.tags.standard(CM.tags.name)], color: "#fab387" },
+      { tag: [CM.tags.definition(CM.tags.name), CM.tags.separator], color: "#cdd6f4" },
+      { tag: [CM.tags.typeName, CM.tags.className, CM.tags.number, CM.tags.changed, CM.tags.annotation, CM.tags.modifier, CM.tags.self, CM.tags.namespace], color: "#f9e2af" },
+      { tag: [CM.tags.operator, CM.tags.operatorKeyword, CM.tags.url, CM.tags.escape, CM.tags.regexp, CM.tags.link, CM.tags.special(CM.tags.string)], color: "#89dceb" },
+      { tag: [CM.tags.meta, CM.tags.comment], color: "#6c7086" },
+      { tag: CM.tags.strong, fontWeight: "bold" },
+      { tag: CM.tags.emphasis, fontStyle: "italic" },
+      { tag: CM.tags.strikethrough, textDecoration: "line-through" },
+      { tag: CM.tags.link, color: "#89b4fa", textDecoration: "underline" },
+      { tag: CM.tags.heading, fontWeight: "bold", color: "#cba6f7" },
+      { tag: [CM.tags.atom, CM.tags.bool, CM.tags.special(CM.tags.variableName)], color: "#fab387" },
+      { tag: [CM.tags.processingInstruction, CM.tags.string, CM.tags.inserted], color: "#a6e3a1" },
+      { tag: CM.tags.invalid, color: "#f38ba8" },
+      { tag: CM.tags.attributeName, color: "#f9e2af" },
+      { tag: CM.tags.tagName, color: "#cba6f7" },
+      { tag: CM.tags.propertyName, color: "#89b4fa" }
+    ]);
+
+    // Define Catppuccin Latte syntax highlighting
+    latteSyntax = CM.HighlightStyle.define([
+      { tag: CM.tags.keyword, color: "#8839ef" },
+      { tag: [CM.tags.name, CM.tags.deleted, CM.tags.character, CM.tags.propertyName, CM.tags.macroName], color: "#4c4f69" },
+      { tag: [CM.tags.function(CM.tags.variableName), CM.tags.labelName], color: "#1e66f5" },
+      { tag: [CM.tags.color, CM.tags.constant(CM.tags.name), CM.tags.standard(CM.tags.name)], color: "#fe640b" },
+      { tag: [CM.tags.definition(CM.tags.name), CM.tags.separator], color: "#4c4f69" },
+      { tag: [CM.tags.typeName, CM.tags.className, CM.tags.number, CM.tags.changed, CM.tags.annotation, CM.tags.modifier, CM.tags.self, CM.tags.namespace], color: "#df8e1d" },
+      { tag: [CM.tags.operator, CM.tags.operatorKeyword, CM.tags.url, CM.tags.escape, CM.tags.regexp, CM.tags.link, CM.tags.special(CM.tags.string)], color: "#04a5e5" },
+      { tag: [CM.tags.meta, CM.tags.comment], color: "#9ca0b0" },
+      { tag: CM.tags.strong, fontWeight: "bold" },
+      { tag: CM.tags.emphasis, fontStyle: "italic" },
+      { tag: CM.tags.strikethrough, textDecoration: "line-through" },
+      { tag: CM.tags.link, color: "#1e66f5", textDecoration: "underline" },
+      { tag: CM.tags.heading, fontWeight: "bold", color: "#8839ef" },
+      { tag: [CM.tags.atom, CM.tags.bool, CM.tags.special(CM.tags.variableName)], color: "#fe640b" },
+      { tag: [CM.tags.processingInstruction, CM.tags.string, CM.tags.inserted], color: "#40a02b" },
+      { tag: CM.tags.invalid, color: "#d20f39" },
+      { tag: CM.tags.attributeName, color: "#df8e1d" },
+      { tag: CM.tags.tagName, color: "#8839ef" },
+      { tag: CM.tags.propertyName, color: "#1e66f5" }
+    ]);
+
     // Create compartments for dynamic configuration
     languageCompartment = new CM.Compartment();
     themeCompartment = new CM.Compartment();
@@ -122,7 +182,6 @@ window.EditorBridge = (function() {
       CM.drawSelection(),
       CM.dropCursor(),
       CM.indentOnInput(),
-      CM.syntaxHighlighting(CM.defaultHighlightStyle, { fallback: true }),
       CM.bracketMatching(),
       CM.closeBrackets(),
       CM.autocompletion(),
@@ -159,7 +218,7 @@ window.EditorBridge = (function() {
       languageCompartment.of([]),
 
       // Theme compartment
-      themeCompartment.of(isDark ? [catppuccinMocha()] : [catppuccinLatte()])
+      themeCompartment.of(isDark ? [catppuccinMocha(), CM.syntaxHighlighting(mochaSyntax)] : [catppuccinLatte(), CM.syntaxHighlighting(latteSyntax)])
     ];
 
     // Create state
@@ -203,10 +262,11 @@ window.EditorBridge = (function() {
   }
 
   function setTheme(isDark) {
-    if (!view || !themeCompartment) return;
+    if (!view || !themeCompartment || !mochaSyntax || !latteSyntax) return;
 
+    const CM = window.CM;
     view.dispatch({
-      effects: themeCompartment.reconfigure(isDark ? [catppuccinMocha()] : [catppuccinLatte()])
+      effects: themeCompartment.reconfigure(isDark ? [catppuccinMocha(), CM.syntaxHighlighting(mochaSyntax)] : [catppuccinLatte(), CM.syntaxHighlighting(latteSyntax)])
     });
   }
 

@@ -27,6 +27,7 @@ function createApp(dbModule) {
           workerSrc: ["'self'"],
           imgSrc: ["'self'", "https:", "data:"],
           styleSrc: ["'self'", "https://cdnjs.cloudflare.com", "'unsafe-inline'"],
+          connectSrc: ["'self'", "https://esm.sh"],
         },
       },
     })

@@ -36,8 +36,10 @@ async function loadCM() {
         foldKeymap,
         LanguageSupport,
         StreamLanguage,
-        indentUnit
+        indentUnit,
+        HighlightStyle
       } = await import(`${CDN_BASE}/@codemirror/language${CM_VERSION}`),
+      { tags } = await import(`${CDN_BASE}/@lezer/highlight@1`),
       {
         closeBrackets,
         closeBracketsKeymap,
@@ -50,7 +52,6 @@ async function loadCM() {
         openSearchPanel
       } = await import(`${CDN_BASE}/@codemirror/search${CM_VERSION}`),
       { lintKeymap } = await import(`${CDN_BASE}/@codemirror/lint${CM_VERSION}`),
-
       // Language packages
       { javascript } = await import(`${CDN_BASE}/@codemirror/lang-javascript${CM_VERSION}`),
       { python } = await import(`${CDN_BASE}/@codemirror/lang-python${CM_VERSION}`),
@@ -68,6 +69,17 @@ async function loadCM() {
       // Legacy modes (StreamLanguage)
       legacyModesModule = await import(`${CDN_BASE}/@codemirror/legacy-modes${CM_VERSION}/mode/go`),
       yamlModule = await import(`${CDN_BASE}/@codemirror/legacy-modes${CM_VERSION}/mode/yaml`),
+      powerShellModule = await import(`${CDN_BASE}/@codemirror/legacy-modes${CM_VERSION}/mode/powershell`),
+      clikeModule = await import(`${CDN_BASE}/@codemirror/legacy-modes${CM_VERSION}/mode/clike`),
+      shellModule = await import(`${CDN_BASE}/@codemirror/legacy-modes${CM_VERSION}/mode/shell`),
+      rubyModule = await import(`${CDN_BASE}/@codemirror/legacy-modes${CM_VERSION}/mode/ruby`),
+      dockerFileModule = await import(`${CDN_BASE}/@codemirror/legacy-modes${CM_VERSION}/mode/dockerfile`),
+      nginxModule = await import(`${CDN_BASE}/@codemirror/legacy-modes${CM_VERSION}/mode/nginx`),
+      luaModule = await import(`${CDN_BASE}/@codemirror/legacy-modes${CM_VERSION}/mode/lua`),
+      perlModule = await import(`${CDN_BASE}/@codemirror/legacy-modes${CM_VERSION}/mode/perl`),
+      rModule = await import(`${CDN_BASE}/@codemirror/legacy-modes${CM_VERSION}/mode/r`),
+      swiftModule = await import(`${CDN_BASE}/@codemirror/legacy-modes${CM_VERSION}/mode/swift`),
+      tomlModule = await import(`${CDN_BASE}/@codemirror/legacy-modes${CM_VERSION}/mode/toml`),
 
       // Theme
       { oneDark } = await import(`${CDN_BASE}/@codemirror/theme-one-dark${CM_VERSION}`)
@@ -76,6 +88,7 @@ async function loadCM() {
       import(`${CDN_BASE}/@codemirror/view${CM_VERSION}`),
       import(`${CDN_BASE}/@codemirror/commands${CM_VERSION}`),
       import(`${CDN_BASE}/@codemirror/language${CM_VERSION}`),
+      import(`${CDN_BASE}/@lezer/highlight@1`),
       import(`${CDN_BASE}/@codemirror/autocomplete${CM_VERSION}`),
       import(`${CDN_BASE}/@codemirror/search${CM_VERSION}`),
       import(`${CDN_BASE}/@codemirror/lint${CM_VERSION}`),
@@ -93,6 +106,17 @@ async function loadCM() {
       import(`${CDN_BASE}/@codemirror/lang-php${CM_VERSION}`),
       import(`${CDN_BASE}/@codemirror/legacy-modes${CM_VERSION}/mode/go`),
       import(`${CDN_BASE}/@codemirror/legacy-modes${CM_VERSION}/mode/yaml`),
+      import(`${CDN_BASE}/@codemirror/legacy-modes${CM_VERSION}/mode/powershell`),
+      import(`${CDN_BASE}/@codemirror/legacy-modes${CM_VERSION}/mode/clike`),
+      import(`${CDN_BASE}/@codemirror/legacy-modes${CM_VERSION}/mode/shell`),
+      import(`${CDN_BASE}/@codemirror/legacy-modes${CM_VERSION}/mode/ruby`),
+      import(`${CDN_BASE}/@codemirror/legacy-modes${CM_VERSION}/mode/dockerfile`),
+      import(`${CDN_BASE}/@codemirror/legacy-modes${CM_VERSION}/mode/nginx`),
+      import(`${CDN_BASE}/@codemirror/legacy-modes${CM_VERSION}/mode/lua`),
+      import(`${CDN_BASE}/@codemirror/legacy-modes${CM_VERSION}/mode/perl`),
+      import(`${CDN_BASE}/@codemirror/legacy-modes${CM_VERSION}/mode/r`),
+      import(`${CDN_BASE}/@codemirror/legacy-modes${CM_VERSION}/mode/swift`),
+      import(`${CDN_BASE}/@codemirror/legacy-modes${CM_VERSION}/mode/toml`),
       import(`${CDN_BASE}/@codemirror/theme-one-dark${CM_VERSION}`)
     ]);
 
@@ -131,6 +155,8 @@ async function loadCM() {
       LanguageSupport,
       StreamLanguage,
       indentUnit,
+      HighlightStyle,
+      tags,
 
       // Autocomplete
       closeBrackets,
@@ -161,6 +187,19 @@ async function loadCM() {
       php,
       go: legacyModesModule.go,
       yaml: yamlModule.yaml,
+      powerShell: powerShellModule.powerShell,
+      cSharp: clikeModule.cSharp,
+      kotlin: clikeModule.kotlin,
+      scala: clikeModule.scala,
+      shell: shellModule.shell,
+      ruby: rubyModule.ruby,
+      dockerFile: dockerFileModule.dockerFile,
+      nginx: nginxModule.nginx,
+      lua: luaModule.lua,
+      perl: perlModule.perl,
+      r: rModule.r,
+      swift: swiftModule.swift,
+      toml: tomlModule.toml,
 
       // Theme
       oneDark
